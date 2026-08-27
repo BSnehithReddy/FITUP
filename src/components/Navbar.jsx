@@ -1,6 +1,6 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
-import { fitupLogo } from '../assets/logoData';
+import { LogoImage } from './Logo';
 import { Dumbbell, Shield, User, LogOut, Ticket, LayoutDashboard, Search } from 'lucide-react';
 
 export const Navbar = ({ activeTab, setActiveTab }) => {
@@ -16,7 +16,7 @@ export const Navbar = ({ activeTab, setActiveTab }) => {
           className="flex items-center space-x-3 cursor-pointer group"
         >
           <div className="relative w-11 h-11 flex items-center justify-center rounded-xl bg-slate-900 border border-electricBlue/30 shadow-[0_0_15px_rgba(0,240,255,0.2)] group-hover:border-electricBlue transition-all overflow-hidden p-1">
-            <img src={fitupLogo} alt="FITUP Logo" className="w-full h-full object-contain" />
+            <LogoImage className="w-full h-full object-contain" />
           </div>
           <div>
             <span className="text-2xl font-black tracking-wider text-white font-outfit">
