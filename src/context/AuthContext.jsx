@@ -1,0 +1,192 @@
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { firestoreService } from '../services/firestoreService';
+import { soundEffects } from '../services/soundEffects';
+
+const AuthContext = createContext();
+
+const REGISTERED_CLIENTS_KEY = "fitup_registered_clients";
+
+export const AuthProvider = ({ children }) => {
+  const [currentUser, setCurrentUser] = useState(() => {
+    const saved = localStorage.getItem("fitup_user_session");
+    return saved ? JSON.parse(saved) : null;
+  });
+
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [authMode, setAuthMode] = useState("login"); // "login" | "register"
+
+  useEffect(() => {
+    if (currentUser) {
+      localStorage.setItem("fitup_user_session", JSON.stringify(currentUser));
+    } else {
+      localStorage.removeItem("fitup_user_session");
+    }
+  }, [currentUser]);
+
+  const openAuthModal = (mode = "login") => {
+    soundEffects.playClick();
+    setAuthMode(mode);
+    setAuthModalOpen(true);
+  };
+
+  const closeAuthModal = () => {
+    soundEffects.playClick();
+    setAuthModalOpen(false);
+  };
+
+  const login = async (phone, password) => {
+    soundEffects.playClick();
+
+    // 1. STRICT OWNER CHECK (SNEHITH)
+    if (phone === "9030118909") {
+      if (password === "Snehith@020777") {
+        const ownerUser = {
+          uid: "usr-owner-snehith",
+          name: "SNEHITH",
+          phone: "9030118909",
+          role: "owner"
+        };
+        setCurrentUser(ownerUser);
+        soundEffects.playSuccessChime();
+        closeAuthModal();
+        return { success: true, user: ownerUser, role: "owner" };
+      } else {
+        soundEffects.playError();
+        throw new Error("Incorrect password or phone number.");
+      }
+    }
+
+    // 2. DYNAMIC TRAINER AUTHENTICATION CHECK
+    const trainers = await firestoreService.getTrainers();
+    const matchedTrainer = trainers.find(t => t.phone === phone);
+
+    if (matchedTrainer) {
+      if (matchedTrainer.password === password) {
+        const trainerUser = {
+          uid: matchedTrainer.trainerId,
+          name: matchedTrainer.name,
+          phone: matchedTrainer.phone,
+          gymId: matchedTrainer.gymId,
+          role: "trainer",
+          trainerId: matchedTrainer.trainerId
+        };
+        setCurrentUser(trainerUser);
+        soundEffects.playSuccessChime();
+        closeAuthModal();
+        return { success: true, user: trainerUser, role: "trainer" };
+      } else {
+        soundEffects.playError();
+        throw new Error("Incorrect password or phone number.");
+      }
+    }
+
+    // 3. REGISTERED CLIENT CHECK
+    const registeredClients = JSON.parse(localStorage.getItem(REGISTERED_CLIENTS_KEY) || "[]");
+    const matchedClient = registeredClients.find(c => c.phone === phone);
+
+    if (matchedClient) {
+      if (matchedClient.password === password) {
+        const clientUser = {
+          uid: matchedClient.uid || "usr-client-" + Date.now(),
+          name: matchedClient.name,
+          phone: matchedClient.phone,
+          role: "client"
+        };
+        setCurrentUser(clientUser);
+        soundEffects.playSuccessChime();
+        closeAuthModal();
+        return { success: true, user: clientUser, role: "client" };
+      } else {
+        soundEffects.playError();
+        throw new Error("Incorrect password or phone number.");
+      }
+    }
+
+    // Default Client Demo Login (Auto-registers client if valid)
+    const newClient = {
+      uid: "usr-client-" + Date.now(),
+      name: "FITUP Member",
+      phone: phone,
+      password: password,
+      role: "client"
+    };
+    registeredClients.push(newClient);
+    localStorage.setItem(REGISTERED_CLIENTS_KEY, JSON.stringify(registeredClients));
+
+    setCurrentUser(newClient);
+    soundEffects.playSuccessChime();
+    closeAuthModal();
+    return { success: true, user: newClient, role: "client" };
+  };
+
+  const register = async (name, phone, password) => {
+    soundEffects.playClick();
+
+    // Check if registering owner phone
+    if (phone === "9030118909") {
+      if (password === "Snehith@020777") {
+        const ownerUser = {
+          uid: "usr-owner-snehith",
+          name: name.toUpperCase() || "SNEHITH",
+          phone: "9030118909",
+          role: "owner"
+        };
+        setCurrentUser(ownerUser);
+        soundEffects.playSuccessChime();
+        closeAuthModal();
+        return { success: true, user: ownerUser, role: "owner" };
+      } else {
+        soundEffects.playError();
+        throw new Error("Incorrect password or phone number.");
+      }
+    }
+
+    // Save Client in Registered Clients DB
+    const registeredClients = JSON.parse(localStorage.getItem(REGISTERED_CLIENTS_KEY) || "[]");
+    const existing = registeredClients.find(c => c.phone === phone);
+
+    if (existing) {
+      soundEffects.playError();
+      throw new Error("An account with this phone number already exists. Please Sign In.");
+    }
+
+    const newClient = {
+      uid: "usr-client-" + Date.now(),
+      name: name,
+      phone: phone,
+      password: password,
+      role: "client"
+    };
+
+    registeredClients.push(newClient);
+    localStorage.setItem(REGISTERED_CLIENTS_KEY, JSON.stringify(registeredClients));
+
+    setCurrentUser(newClient);
+    soundEffects.playSuccessChime();
+    closeAuthModal();
+    return { success: true, user: newClient, role: "client" };
+  };
+
+  const logout = () => {
+    soundEffects.playClick();
+    setCurrentUser(null);
+  };
+
+  return (
+    <AuthContext.Provider value={{
+      currentUser,
+      authModalOpen,
+      authMode,
+      openAuthModal,
+      closeAuthModal,
+      setAuthMode,
+      login,
+      register,
+      logout
+    }}>
+      {children}
+    </AuthContext.Provider>
+  );
+};
+
+export const useAuth = () => useContext(AuthContext);
