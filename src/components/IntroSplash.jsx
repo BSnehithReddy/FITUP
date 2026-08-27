@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import fitupLogo from '../assets/fitup-logo.png';
+import { fitupLogo } from '../assets/logoData';
 import { Dumbbell, Flame, Zap } from 'lucide-react';
 
 export const IntroSplash = ({ onFinish }) => {
@@ -55,7 +55,7 @@ export const IntroSplash = ({ onFinish }) => {
           <img 
             src={fitupLogo} 
             alt="FITUP Logo" 
-            className="w-24 h-24 object-contain drop-shadow-[0_0_20px_rgba(0,240,255,0.6)]" 
+            className="w-24 h-24 object-contain rounded-2xl drop-shadow-[0_0_20px_rgba(0,240,255,0.6)]" 
           />
         </div>
 
