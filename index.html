@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <base href="./">
     <title>FITUP - Book. Lift. Repeat. | Single-Session Gym PT Slots (₹200/Slot)</title>
     <meta name="description" content="Book 2-hour Personal Training trial slots at top local gyms for just ₹200-₹250 per session. FITUP - Book. Lift. Repeat.">
     <!-- PWA Manifest & Meta Tags -->
@@ -23,12 +24,15 @@
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
     
-    <!-- PWA Service Worker Registration -->
+    <!-- PWA Service Worker Registration with Auto-Update -->
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('sw.js')
-            .then((reg) => console.log('FITUP PWA Service Worker Registered!', reg))
+            .then((reg) => {
+              reg.update();
+              console.log('FITUP PWA Service Worker v2 Active!', reg);
+            })
             .catch((err) => console.warn('PWA Service Worker Registration Failed:', err));
         });
       }
