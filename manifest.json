@@ -1,0 +1,18 @@
+{
+  "short_name": "FITUP",
+  "name": "FITUP - Book. Lift. Repeat.",
+  "description": "Single-Session Gym PT Slot Booking Application (₹200/Slot)",
+  "icons": [
+    {
+      "src": "assets/fitup-logo.png",
+      "sizes": "192x192 512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "./index.html",
+  "background_color": "#070b19",
+  "theme_color": "#070b19",
+  "display": "standalone",
+  "orientation": "portrait"
+}

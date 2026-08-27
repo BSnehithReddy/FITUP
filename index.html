@@ -5,8 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>FITUP - Book. Lift. Repeat. | Single-Session Gym PT Slots (₹200/Slot)</title>
     <meta name="description" content="Book 2-hour Personal Training trial slots at top local gyms for just ₹200-₹250 per session. FITUP - Book. Lift. Repeat.">
+    <!-- PWA Manifest & Meta Tags -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#070b19">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="FITUP">
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="./assets/fitup-logo-BRpsouIZ.png">
+    <link rel="apple-touch-icon" href="./assets/fitup-logo-BRpsouIZ.png">
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -16,5 +23,16 @@
 </head>
 <body class="bg-[#070b19] text-gray-100 font-inter antialiased min-h-screen selection:bg-[#00f0ff]/30 selection:text-[#00f0ff]">
     <div id="root"></div>
+    
+    <!-- PWA Service Worker Registration -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('sw.js')
+            .then((reg) => console.log('FITUP PWA Service Worker Registered!', reg))
+            .catch((err) => console.warn('PWA Service Worker Registration Failed:', err));
+        });
+      }
+    </script>
 </body>
 </html>
