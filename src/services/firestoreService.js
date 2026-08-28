@@ -23,27 +23,27 @@ const INITIAL_DATA = {
     gyms: [
         {
             gymId: "gym-1",
-            name: "GS - Gym & Fitness Arena",
-            location: "Hitec City, Hyderabad",
-            address: "Plot 42, Mindspace Road, Hitec City, Hyderabad",
+            name: "GS fitness studio",
+            location: "chengicherla , Hyderabad",
+            address: "Main Road, Chengicherla, Hyderabad",
             image: "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&w=800&q=80",
             rating: 4.9,
-            startingPrice: 200,
+            startingPrice: 280,
             amenities: ["AC", "Free Locker", "Steam Bath", "Protein Bar"],
             ownerUpiId: "9030118909@ybl",
-            ownerQrCodeUrl: "https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=upi://pay?pa=9030118909@ybl&pn=FITUP%20Owner&am=200&cu=INR"
+            ownerQrCodeUrl: "https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=upi://pay?pa=9030118909@ybl&pn=FITUP%20Owner&am=280&cu=INR"
         },
         {
             gymId: "gym-2",
-            name: "Pulse Fitness Club",
-            location: "Gachibowli, Hyderabad",
-            address: "Opposite DLF Cyber City, Gachibowli, Hyderabad",
+            name: "fusion fitness",
+            location: "chengicherla, Hyderabad",
+            address: "Opposite Commercial Complex, Chengicherla, Hyderabad",
             image: "https://images.unsplash.com/photo-1540497077202-7c8a3999166f?auto=format&fit=crop&w=800&q=80",
             rating: 4.8,
-            startingPrice: 220,
+            startingPrice: 250,
             amenities: ["Crossfit Zone", "Cardio Deck", "Sauna", "Certified Trainers"],
             ownerUpiId: "9030118909@ybl",
-            ownerQrCodeUrl: "https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=upi://pay?pa=9030118909@ybl&pn=FITUP%20Owner&am=220&cu=INR"
+            ownerQrCodeUrl: "https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=upi://pay?pa=9030118909@ybl&pn=FITUP%20Owner&am=250&cu=INR"
         },
         {
             gymId: "gym-3",
@@ -55,7 +55,7 @@ const INITIAL_DATA = {
             startingPrice: 250,
             amenities: ["Heavy Powerlifting", "Physio Zone", "Valet Parking", "Juice Bar"],
             ownerUpiId: "9030118909@ybl",
-            ownerQrCodeUrl: "https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=upi://pay?pa=9030118909@ybl&pn=FITUP%20Owner&am=200&cu=INR"
+            ownerQrCodeUrl: "https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=upi://pay?pa=9030118909@ybl&pn=FITUP%20Owner&am=250&cu=INR"
         }
     ],
     trainers: [
@@ -69,13 +69,13 @@ const INITIAL_DATA = {
             walletBalance: 450,
             specialization: "Hypertrophy & Strength",
             experience: "7+ Years • Certified CSCS",
-            price: 200,
+            price: 280,
             image: "https://images.unsplash.com/photo-1567013127542-490d757e51fc?auto=format&fit=crop&w=400&q=80",
             availableTimings: ["06:00 AM - 08:00 AM", "09:00 AM - 11:00 AM", "04:00 PM - 06:00 PM", "06:00 PM - 08:00 PM"]
         },
         {
             trainerId: "tr-2",
-            gymId: "gym-1",
+            gymId: "gym-2",
             name: "Rahul Verma",
             phone: "9876543210",
             password: "Trainer@123",
@@ -83,23 +83,9 @@ const INITIAL_DATA = {
             walletBalance: 300,
             specialization: "Fat Loss & HIIT Transformation",
             experience: "4+ Years • K11 Certified",
-            price: 200,
+            price: 250,
             image: "https://images.unsplash.com/photo-1583454110551-21f2fa2afe61?auto=format&fit=crop&w=400&q=80",
             availableTimings: ["09:00 AM - 11:00 AM", "11:00 AM - 01:00 PM", "06:00 PM - 08:00 PM"]
-        },
-        {
-            trainerId: "tr-3",
-            gymId: "gym-2",
-            name: "Ananya Reddy",
-            phone: "9701122334",
-            password: "Trainer@123",
-            upiId: "ananya@upi",
-            walletBalance: 600,
-            specialization: "Functional Strength & Mobility",
-            experience: "5+ Years • ACE Certified Specialist",
-            price: 220,
-            image: "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?auto=format&fit=crop&w=400&q=80",
-            availableTimings: ["06:00 AM - 08:00 AM", "02:00 PM - 04:00 PM", "08:00 PM - 10:00 PM"]
         }
     ],
     bookings: [
@@ -109,29 +95,19 @@ const INITIAL_DATA = {
             userName: "Karthik Raja",
             userPhone: "9876500112",
             gymId: "gym-1",
-            gymName: "GS - Gym & Fitness Arena",
+            gymName: "GS fitness studio",
             trainerId: "tr-1",
             trainerName: "Vikram Sharma",
             slotTime: "09:00 AM - 11:00 AM",
             date: "2026-08-28",
-            amount: 200,
+            amount: 280,
             status: "VERIFIED",
             txnId: "UTR-903011890111",
             screenshotUrl: "https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?auto=format&fit=crop&w=400&q=80",
             createdAt: new Date().toISOString()
         }
     ],
-    payoutRequests: [
-        {
-            requestId: "PO-1001",
-            trainerId: "tr-1",
-            trainerName: "Vikram Sharma",
-            amountRequested: 300,
-            status: "PENDING",
-            requestedAt: new Date(Date.now() - 3 * 3600 * 1000).toISOString(),
-            availableAt: new Date(Date.now() + 9 * 3600 * 1000).toISOString()
-        }
-    ]
+    payoutRequests: []
 };
 
 const STORAGE_KEYS = {
@@ -163,7 +139,11 @@ const initLocalStore = () => {
 initLocalStore();
 
 export const firestoreService = {
-    // 0ms Synchronous Reads with Background Firestore Sync
+    forceMasterSync() {
+        emitDataSync();
+        return true;
+    },
+
     getOwnerConfigSync() {
         return JSON.parse(localStorage.getItem(STORAGE_KEYS.OWNER_CONFIG) || JSON.stringify(INITIAL_DATA.ownerConfig));
     },
@@ -178,12 +158,10 @@ export const firestoreService = {
         localStorage.setItem(STORAGE_KEYS.OWNER_CONFIG, JSON.stringify(updated));
         emitDataSync();
         
-        // Non-blocking Firestore Sync
         setDoc(doc(db, "config", "owner_settings"), configData, { merge: true }).catch(() => {});
         return updated;
     },
 
-    // GYMS
     getGymsSync() {
         return JSON.parse(localStorage.getItem(STORAGE_KEYS.GYMS) || "[]");
     },
@@ -203,7 +181,6 @@ export const firestoreService = {
             savedGym.gymId = 'gym-' + Date.now();
         }
         
-        // Synchronous Local Update (0ms latency)
         const gyms = this.getGymsSync();
         const idx = gyms.findIndex(g => g.gymId === savedGym.gymId);
         if (idx !== -1) gyms[idx] = savedGym;
@@ -211,7 +188,6 @@ export const firestoreService = {
         localStorage.setItem(STORAGE_KEYS.GYMS, JSON.stringify(gyms));
         emitDataSync();
 
-        // Non-blocking Firestore Sync
         setDoc(doc(db, "gyms", savedGym.gymId), savedGym).catch(() => {});
         return savedGym;
     },
@@ -224,11 +200,9 @@ export const firestoreService = {
         localStorage.setItem(STORAGE_KEYS.TRAINERS, JSON.stringify(trainers));
         emitDataSync();
 
-        // Non-blocking Firestore Delete
         deleteDoc(doc(db, "gyms", gymId)).catch(() => {});
     },
 
-    // TRAINERS
     getTrainersSync() {
         return JSON.parse(localStorage.getItem(STORAGE_KEYS.TRAINERS) || "[]");
     },
@@ -244,7 +218,6 @@ export const firestoreService = {
             if (savedTrainer.walletBalance === undefined) savedTrainer.walletBalance = 0;
         }
 
-        // Synchronous Local Update (0ms latency)
         const trainers = this.getTrainersSync();
         const idx = trainers.findIndex(t => t.trainerId === savedTrainer.trainerId);
         if (idx !== -1) trainers[idx] = savedTrainer;
@@ -252,7 +225,6 @@ export const firestoreService = {
         localStorage.setItem(STORAGE_KEYS.TRAINERS, JSON.stringify(trainers));
         emitDataSync();
 
-        // Non-blocking Firestore Sync
         setDoc(doc(db, "trainers", savedTrainer.trainerId), savedTrainer).catch(() => {});
         return savedTrainer;
     },
@@ -262,11 +234,9 @@ export const firestoreService = {
         localStorage.setItem(STORAGE_KEYS.TRAINERS, JSON.stringify(trainers));
         emitDataSync();
 
-        // Non-blocking Firestore Delete
         deleteDoc(doc(db, "trainers", trainerId)).catch(() => {});
     },
 
-    // BOOKINGS
     getBookingsSync() {
         return JSON.parse(localStorage.getItem(STORAGE_KEYS.BOOKINGS) || "[]");
     },
@@ -287,7 +257,6 @@ export const firestoreService = {
         bookings.unshift(newBooking);
         localStorage.setItem(STORAGE_KEYS.BOOKINGS, JSON.stringify(bookings));
 
-        // Credit 75% to Trainer Digital Wallet
         const trainers = this.getTrainersSync();
         const trainerIndex = trainers.findIndex(t => t.trainerId === newBooking.trainerId);
         if (trainerIndex !== -1) {
@@ -297,12 +266,10 @@ export const firestoreService = {
         }
         emitDataSync();
 
-        // Non-blocking Firestore Sync
         setDoc(doc(db, "bookings", newBooking.bookingId), newBooking).catch(() => {});
         return newBooking;
     },
 
-    // PAYOUT REQUESTS
     getPayoutRequestsSync() {
         return JSON.parse(localStorage.getItem(STORAGE_KEYS.PAYOUT_REQUESTS) || "[]");
     },
@@ -320,7 +287,6 @@ export const firestoreService = {
             throw new Error("Insufficient wallet balance for withdrawal");
         }
 
-        // Auto-debit wallet balance synchronously
         trainers[trainerIndex].walletBalance -= amountRequested;
         localStorage.setItem(STORAGE_KEYS.TRAINERS, JSON.stringify(trainers));
 
@@ -342,7 +308,6 @@ export const firestoreService = {
         localStorage.setItem(STORAGE_KEYS.PAYOUT_REQUESTS, JSON.stringify(requests));
         emitDataSync();
 
-        // Non-blocking Firestore Sync
         setDoc(doc(db, "payoutRequests", newRequest.requestId), newRequest).catch(() => {});
         return newRequest;
     },

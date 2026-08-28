@@ -4,7 +4,7 @@ import { soundEffects } from '../services/soundEffects';
 import { SafeImage } from './SafeImage';
 import { 
   Building2, Users, Wallet, Plus, Trash2, Edit, CheckCircle2, 
-  Clock, ArrowUpRight, ShieldCheck, Sparkles, Image as ImageIcon, QrCode
+  Clock, ArrowUpRight, ShieldCheck, Sparkles, Image as ImageIcon, QrCode, RefreshCw
 } from 'lucide-react';
 
 const PRESET_GYM_IMAGES = [
@@ -36,6 +36,7 @@ export const OwnerDashboard = () => {
   const [bookings, setBookings] = useState([]);
   const [payoutRequests, setPayoutRequests] = useState([]);
   const [ownerConfig, setOwnerConfig] = useState({ ownerUpiId: '', ownerQrCodeUrl: '' });
+  const [isSyncing, setIsSyncing] = useState(false);
 
   // Modals State
   const [showGymModal, setShowGymModal] = useState(false);
@@ -45,11 +46,11 @@ export const OwnerDashboard = () => {
 
   // Form State
   const [gymForm, setGymForm] = useState({
-    name: '', location: '', address: '', image: PRESET_GYM_IMAGES[0].url, startingPrice: 200, amenities: ['AC', 'Free Locker']
+    name: '', location: '', address: '', image: PRESET_GYM_IMAGES[0].url, startingPrice: 280, amenities: ['AC', 'Free Locker']
   });
 
   const [trainerForm, setTrainerForm] = useState({
-    name: '', phone: '', password: 'Trainer@123', gymId: '', price: 200, specialization: 'Hypertrophy & Strength', experience: '5+ Years', image: PRESET_TRAINER_IMAGES[0].url, availableTimings: ["06:00 AM - 08:00 AM", "09:00 AM - 11:00 AM", "04:00 PM - 06:00 PM"]
+    name: '', phone: '', password: 'Trainer@123', gymId: '', price: 280, specialization: 'Hypertrophy & Strength', experience: '5+ Years', image: PRESET_TRAINER_IMAGES[0].url, availableTimings: ["06:00 AM - 08:00 AM", "09:00 AM - 11:00 AM", "04:00 PM - 06:00 PM"]
   });
 
   const [upiForm, setUpiForm] = useState({
@@ -81,6 +82,18 @@ export const OwnerDashboard = () => {
     setTimeout(() => setToastMessage(null), 3000);
   };
 
+  // Master Save & Sync Changes Button Handler
+  const handleMasterSaveAndSync = () => {
+    soundEffects.playClick();
+    setIsSyncing(true);
+    
+    setTimeout(() => {
+      firestoreService.forceMasterSync();
+      setIsSyncing(false);
+      showToast("Pushed & Synced Live to Website!");
+    }, 600);
+  };
+
   // GYM CRUD
   const handleOpenGymModal = (gym = null) => {
     soundEffects.playClick();
@@ -91,13 +104,13 @@ export const OwnerDashboard = () => {
         location: gym.location,
         address: gym.address || '',
         image: gym.image || PRESET_GYM_IMAGES[0].url,
-        startingPrice: gym.startingPrice || 200,
+        startingPrice: gym.startingPrice || 280,
         amenities: gym.amenities || ['AC']
       });
     } else {
       setEditingGym(null);
       setGymForm({
-        name: '', location: '', address: '', image: PRESET_GYM_IMAGES[0].url, startingPrice: 200, amenities: ['AC', 'Free Locker', 'Steam Bath']
+        name: '', location: '', address: '', image: PRESET_GYM_IMAGES[0].url, startingPrice: 280, amenities: ['AC', 'Free Locker', 'Steam Bath']
       });
     }
     setShowGymModal(true);
@@ -142,7 +155,7 @@ export const OwnerDashboard = () => {
         phone: trainer.phone,
         password: trainer.password || 'Trainer@123',
         gymId: trainer.gymId,
-        price: trainer.price || 200,
+        price: trainer.price || 280,
         specialization: trainer.specialization || 'Strength & Conditioning',
         experience: trainer.experience || '5+ Years',
         image: trainer.image || PRESET_TRAINER_IMAGES[0].url,
@@ -155,7 +168,7 @@ export const OwnerDashboard = () => {
         phone: '',
         password: 'Trainer@123',
         gymId: defaultGymId,
-        price: 200,
+        price: 280,
         specialization: 'Hypertrophy & Strength',
         experience: '5+ Years CSCS',
         image: PRESET_TRAINER_IMAGES[0].url,
@@ -215,7 +228,7 @@ export const OwnerDashboard = () => {
   };
 
   // Analytics Calculations
-  const grossRevenue = bookings.reduce((sum, b) => sum + (b.amount || 200), 0);
+  const grossRevenue = bookings.reduce((sum, b) => sum + (b.amount || 280), 0);
   const netOwnerShare = grossRevenue * 0.25;
   const trainerSplitShare = grossRevenue * 0.75;
 
@@ -246,7 +259,17 @@ export const OwnerDashboard = () => {
           </p>
         </div>
 
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 items-center">
+          {/* PROMINENT MASTER SAVE & SYNC BUTTON */}
+          <button
+            onClick={handleMasterSaveAndSync}
+            disabled={isSyncing}
+            className="px-5 py-2.5 bg-gradient-to-r from-emerald-400 to-emerald-500 text-slate-950 font-black rounded-xl text-xs shadow-[0_0_20px_#34d399] hover:scale-105 transition-all flex items-center gap-2 border border-emerald-300"
+          >
+            <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
+            <span>{isSyncing ? 'Syncing...' : 'Save & Sync Changes to Website'}</span>
+          </button>
+
           <button
             onClick={() => handleOpenGymModal()}
             className="px-4 py-2.5 bg-electricBlue text-slate-950 font-bold rounded-xl text-xs hover:shadow-[0_0_15px_#00f0ff] transition-all flex items-center gap-1.5"
@@ -325,7 +348,7 @@ export const OwnerDashboard = () => {
                   <div className="overflow-hidden">
                     <h4 className="text-sm font-bold text-white truncate">{g.name}</h4>
                     <p className="text-xs text-slate-400 truncate">{g.location}</p>
-                    <span className="text-[10px] text-electricBlue font-bold">₹{g.startingPrice || 200}/Slot</span>
+                    <span className="text-[10px] text-electricBlue font-bold">₹{g.startingPrice || 280}/Slot</span>
                   </div>
                 </div>
 
@@ -532,7 +555,7 @@ export const OwnerDashboard = () => {
                   type="text"
                   value={gymForm.name}
                   onChange={(e) => setGymForm({ ...gymForm, name: e.target.value })}
-                  placeholder="e.g. GS - Gym & Fitness Arena"
+                  placeholder="e.g. GS fitness studio"
                   className="w-full bg-slate-900 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-electricBlue"
                 />
               </div>
