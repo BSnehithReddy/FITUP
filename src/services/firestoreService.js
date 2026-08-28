@@ -8,6 +8,12 @@ import {
     deleteDoc 
 } from "../firebase";
 
+const emitDataSync = () => {
+    if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('fitup_data_sync'));
+    }
+};
+
 const INITIAL_DATA = {
     ownerConfig: {
         ownerUpiId: "9030118909@ybl",
@@ -37,7 +43,7 @@ const INITIAL_DATA = {
             startingPrice: 220,
             amenities: ["Crossfit Zone", "Cardio Deck", "Sauna", "Certified Trainers"],
             ownerUpiId: "9030118909@ybl",
-            ownerQrCodeUrl: "https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=upi://pay?pa=9030118909@ybl&pn=FITUP%20Owner&am=200&cu=INR"
+            ownerQrCodeUrl: "https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=upi://pay?pa=9030118909@ybl&pn=FITUP%20Owner&am=220&cu=INR"
         },
         {
             gymId: "gym-3",
@@ -107,7 +113,7 @@ const INITIAL_DATA = {
             trainerId: "tr-1",
             trainerName: "Vikram Sharma",
             slotTime: "09:00 AM - 11:00 AM",
-            date: "2026-08-27",
+            date: "2026-08-28",
             amount: 200,
             status: "VERIFIED",
             txnId: "UTR-903011890111",
@@ -170,6 +176,7 @@ export const firestoreService = {
         const current = this.getOwnerConfigSync();
         const updated = { ...current, ...configData };
         localStorage.setItem(STORAGE_KEYS.OWNER_CONFIG, JSON.stringify(updated));
+        emitDataSync();
         
         // Non-blocking Firestore Sync
         setDoc(doc(db, "config", "owner_settings"), configData, { merge: true }).catch(() => {});
@@ -202,6 +209,7 @@ export const firestoreService = {
         if (idx !== -1) gyms[idx] = savedGym;
         else gyms.push(savedGym);
         localStorage.setItem(STORAGE_KEYS.GYMS, JSON.stringify(gyms));
+        emitDataSync();
 
         // Non-blocking Firestore Sync
         setDoc(doc(db, "gyms", savedGym.gymId), savedGym).catch(() => {});
@@ -214,6 +222,7 @@ export const firestoreService = {
 
         let trainers = this.getTrainersSync().filter(t => t.gymId !== gymId);
         localStorage.setItem(STORAGE_KEYS.TRAINERS, JSON.stringify(trainers));
+        emitDataSync();
 
         // Non-blocking Firestore Delete
         deleteDoc(doc(db, "gyms", gymId)).catch(() => {});
@@ -241,6 +250,7 @@ export const firestoreService = {
         if (idx !== -1) trainers[idx] = savedTrainer;
         else trainers.push(savedTrainer);
         localStorage.setItem(STORAGE_KEYS.TRAINERS, JSON.stringify(trainers));
+        emitDataSync();
 
         // Non-blocking Firestore Sync
         setDoc(doc(db, "trainers", savedTrainer.trainerId), savedTrainer).catch(() => {});
@@ -250,6 +260,7 @@ export const firestoreService = {
     async deleteTrainer(trainerId) {
         let trainers = this.getTrainersSync().filter(t => t.trainerId !== trainerId);
         localStorage.setItem(STORAGE_KEYS.TRAINERS, JSON.stringify(trainers));
+        emitDataSync();
 
         // Non-blocking Firestore Delete
         deleteDoc(doc(db, "trainers", trainerId)).catch(() => {});
@@ -284,6 +295,7 @@ export const firestoreService = {
             trainers[trainerIndex].walletBalance = (trainers[trainerIndex].walletBalance || 0) + sessionEarnings;
             localStorage.setItem(STORAGE_KEYS.TRAINERS, JSON.stringify(trainers));
         }
+        emitDataSync();
 
         // Non-blocking Firestore Sync
         setDoc(doc(db, "bookings", newBooking.bookingId), newBooking).catch(() => {});
@@ -328,6 +340,7 @@ export const firestoreService = {
         const requests = this.getPayoutRequestsSync();
         requests.unshift(newRequest);
         localStorage.setItem(STORAGE_KEYS.PAYOUT_REQUESTS, JSON.stringify(requests));
+        emitDataSync();
 
         // Non-blocking Firestore Sync
         setDoc(doc(db, "payoutRequests", newRequest.requestId), newRequest).catch(() => {});
@@ -340,6 +353,7 @@ export const firestoreService = {
         if (reqIdx !== -1) {
             requests[reqIdx].status = "APPROVED";
             localStorage.setItem(STORAGE_KEYS.PAYOUT_REQUESTS, JSON.stringify(requests));
+            emitDataSync();
             setDoc(doc(db, "payoutRequests", requestId), requests[reqIdx], { merge: true }).catch(() => {});
         }
         return requests[reqIdx];

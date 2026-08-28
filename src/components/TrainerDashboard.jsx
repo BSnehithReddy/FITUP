@@ -1,247 +1,190 @@
 import React, { useState, useEffect } from 'react';
 import { firestoreService } from '../services/firestoreService';
-import { useAuth } from '../context/AuthContext';
 import { soundEffects } from '../services/soundEffects';
-import { Wallet, Clock, Calendar, ArrowUpRight, CheckCircle, Hourglass, Plus, Building2, User, Sparkles } from 'lucide-react';
+import { SafeImage } from './SafeImage';
+import { 
+  Wallet, Building2, Clock, Users, ArrowUpRight, ShieldCheck, 
+  CheckCircle2, AlertCircle, Dumbbell, UserCheck, RefreshCw
+} from 'lucide-react';
 
-export const TrainerDashboard = () => {
-  const { currentUser } = useAuth();
-  
-  const [trainerProfile, setTrainerProfile] = useState(null);
-  const [belongingGym, setBelongingGym] = useState(null);
-  const [assignedBookings, setAssignedBookings] = useState([]);
+export const TrainerDashboard = ({ trainerUser }) => {
+  const [gyms, setGyms] = useState([]);
+  const [trainers, setTrainers] = useState([]);
+  const [bookings, setBookings] = useState([]);
   const [payoutRequests, setPayoutRequests] = useState([]);
-  
-  // Withdrawal Form State
-  const [withdrawModalOpen, setWithdrawModalOpen] = useState(false);
+
+  // Withdrawal Modal State
+  const [showWithdrawModal, setShowWithdrawModal] = useState(false);
   const [withdrawAmount, setWithdrawAmount] = useState('');
-  const [withdrawError, setWithdrawError] = useState('');
-  const [withdrawSuccess, setWithdrawSuccess] = useState('');
+  const [toastMessage, setToastMessage] = useState(null);
 
-  // Timings State
-  const [availableTimings, setAvailableTimings] = useState([]);
-  const [newTimingInput, setNewTimingInput] = useState('');
-  const [timingMsg, setTimingMsg] = useState('');
-
-  useEffect(() => {
-    loadTrainerData();
-  }, [currentUser]);
-
-  const loadTrainerData = async () => {
-    if (!currentUser) return;
-    
-    const trainersData = await firestoreService.getTrainers();
-    const matched = trainersData.find(t => t.trainerId === currentUser.trainerId || t.phone === currentUser.phone);
-    
-    if (matched) {
-      setTrainerProfile(matched);
-      setAvailableTimings(matched.availableTimings || []);
-
-      // Fetch belonging gym
-      const gym = await firestoreService.getGymById(matched.gymId);
-      setBelongingGym(gym);
-    }
-
-    const allBookings = await firestoreService.getBookings();
-    const trainerBookings = allBookings.filter(b => b.trainerId === matched?.trainerId || b.trainerName === matched?.name || b.trainerName === currentUser.name);
-    setAssignedBookings(trainerBookings);
-
-    const allPayouts = await firestoreService.getPayoutRequests();
-    const trainerPayouts = allPayouts.filter(p => p.trainerId === matched?.trainerId || p.trainerName === matched?.name || p.trainerName === currentUser.name);
-    setPayoutRequests(trainerPayouts);
+  const loadData = () => {
+    setGyms(firestoreService.getGymsSync());
+    setTrainers(firestoreService.getTrainersSync());
+    setBookings(firestoreService.getBookingsSync());
+    setPayoutRequests(firestoreService.getPayoutRequestsSync());
   };
 
-  const handleWithdrawSubmit = async (e) => {
+  useEffect(() => {
+    loadData();
+    const handleSync = () => loadData();
+    window.addEventListener('fitup_data_sync', handleSync);
+    return () => window.removeEventListener('fitup_data_sync', handleSync);
+  }, []);
+
+  // Find active trainer profile
+  const currentTrainer = trainers.find(t => 
+    (trainerUser?.phone && t.phone === trainerUser.phone) || 
+    (trainerUser?.trainerId && t.trainerId === trainerUser.trainerId)
+  ) || trainers[0] || {
+    trainerId: 'tr-1',
+    name: trainerUser?.name || 'Trainer Pro',
+    gymId: 'gym-1',
+    walletBalance: 450,
+    specialization: 'Hypertrophy & Strength',
+    experience: '7+ Years'
+  };
+
+  const belongingGym = gyms.find(g => g.gymId === currentTrainer.gymId) || {
+    name: 'GS - Gym & Fitness Arena',
+    location: 'Hitec City, Hyderabad'
+  };
+
+  // Assigned bookings for this trainer
+  const myBookings = bookings.filter(b => b.trainerId === currentTrainer.trainerId);
+
+  // My payout requests
+  const myPayouts = payoutRequests.filter(p => p.trainerId === currentTrainer.trainerId);
+
+  const showToast = (msg) => {
+    soundEffects.playSuccessChime();
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3000);
+  };
+
+  const handleWithdrawRequest = async (e) => {
     e.preventDefault();
     soundEffects.playClick();
-    setWithdrawError('');
-    setWithdrawSuccess('');
+    const amt = Number(withdrawAmount);
 
-    const amount = parseFloat(withdrawAmount);
-    if (isNaN(amount) || amount <= 0) {
-      soundEffects.playError();
-      setWithdrawError('Please enter a valid positive withdrawal amount.');
+    if (!amt || amt <= 0) {
+      alert("Please enter a valid withdrawal amount");
       return;
     }
 
-    if (!trainerProfile || (trainerProfile.walletBalance || 0) < amount) {
+    if (amt > (currentTrainer.walletBalance || 0)) {
       soundEffects.playError();
-      setWithdrawError('Insufficient wallet balance for withdrawal request.');
+      alert("Insufficient wallet balance for withdrawal!");
       return;
     }
 
     try {
-      await firestoreService.requestPayout(trainerProfile.trainerId, trainerProfile.name, amount);
-      soundEffects.playSuccessChime();
-      setWithdrawSuccess(`Payout request for ₹${amount} submitted! 12-hour processing window logged.`);
+      await firestoreService.requestPayout(currentTrainer.trainerId, currentTrainer.name, amt);
+      setShowWithdrawModal(false);
       setWithdrawAmount('');
-      loadTrainerData();
-      setTimeout(() => setWithdrawModalOpen(false), 2000);
+      showToast(`Withdrawal request for ₹${amt} submitted! 12-Hour Approval Timer Started.`);
     } catch (err) {
       soundEffects.playError();
-      setWithdrawError(err.message || 'Failed to submit withdrawal request.');
+      alert(err.message || "Failed to process withdrawal request");
     }
   };
-
-  const handleSaveTimings = async () => {
-    soundEffects.playClick();
-    if (!trainerProfile) return;
-    setTimingMsg('');
-    const updated = {
-      ...trainerProfile,
-      availableTimings
-    };
-    await firestoreService.saveTrainer(updated);
-    setTrainerProfile(updated);
-    soundEffects.playSuccessChime();
-    setTimingMsg('Working hours updated successfully! ✅');
-    setTimeout(() => setTimingMsg(''), 3000);
-  };
-
-  const handleAddTimingSlot = () => {
-    soundEffects.playClick();
-    if (!newTimingInput.trim()) return;
-    if (!availableTimings.includes(newTimingInput.trim())) {
-      setAvailableTimings([...availableTimings, newTimingInput.trim()]);
-      setNewTimingInput('');
-    }
-  };
-
-  const handleRemoveTimingSlot = (index) => {
-    soundEffects.playClick();
-    const updated = availableTimings.filter((_, i) => i !== index);
-    setAvailableTimings(updated);
-  };
-
-  // Calculate earnings stats
-  const totalSessionsCompleted = assignedBookings.length;
-  const totalGrossRevenue = assignedBookings.reduce((sum, b) => sum + (b.amount || 200), 0);
-  const totalTrainerEarnings = totalGrossRevenue * 0.75; // 75% Split
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8 space-y-8 animate-fadeIn">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
       
-      {/* 1. TOP HEADER & BELONGING GYM BADGE */}
-      <div className="glass-panel p-6 md:p-8 rounded-3xl border border-vibrantOrange/30 shadow-[0_0_40px_rgba(255,85,0,0.15)] flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center space-x-2 text-xs font-mono font-bold text-vibrantOrange uppercase tracking-wider mb-1">
-            <Sparkles className="w-4 h-4" />
-            <span>TRAINER PORTAL</span>
+      {/* Toast Banner */}
+      {toastMessage && (
+        <div className="fixed top-24 right-6 z-50 bg-emerald-500 text-slate-950 px-5 py-3 rounded-2xl font-bold shadow-[0_0_20px_#34d399] flex items-center gap-2 animate-bounce">
+          <CheckCircle2 className="w-5 h-5" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
+
+      {/* TOP BELONGING GYM & TRAINER PROFILE HEADER */}
+      <div className="glass-panel p-6 rounded-3xl border border-vibrantOrange/30 shadow-2xl relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-vibrantOrange/10 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="flex items-center space-x-4 z-10">
+          <SafeImage
+            src={currentTrainer.image}
+            alt={currentTrainer.name}
+            fallbackType="trainer"
+            className="w-16 h-16 rounded-2xl object-cover border-2 border-vibrantOrange shadow-[0_0_15px_rgba(255,85,0,0.3)]"
+          />
+
+          <div>
+            <span className="text-xs font-bold tracking-[0.25em] text-vibrantOrange uppercase flex items-center gap-1.5">
+              <UserCheck className="w-4 h-4" /> Certified Trainer Pro Portal
+            </span>
+            <h1 className="text-3xl font-extrabold text-white font-outfit mt-0.5">
+              {currentTrainer.name}
+            </h1>
+            <p className="text-sm text-electricBlue font-semibold flex items-center gap-1.5 mt-0.5">
+              <Building2 className="w-4 h-4" />
+              <span>Belonging Gym: <strong className="text-white font-outfit">{belongingGym.name}</strong> ({belongingGym.location})</span>
+            </p>
           </div>
-
-          <h1 className="text-3xl md:text-4xl font-black text-white font-outfit">
-            {trainerProfile?.name || currentUser?.name}
-          </h1>
-
-          {belongingGym && (
-            <div className="flex items-center space-x-2 mt-2 text-sm text-slate-300">
-              <Building2 className="w-4 h-4 text-electricBlue" />
-              <span className="font-semibold text-white">Belonging Gym:</span>
-              <span className="px-2.5 py-0.5 rounded-lg bg-electricBlue/10 text-electricBlue font-bold border border-electricBlue/30">
-                {belongingGym.name} ({belongingGym.location})
-              </span>
-            </div>
-          )}
         </div>
 
-        <button
-          onClick={() => { soundEffects.playClick(); setWithdrawModalOpen(true); }}
-          className="px-6 py-3 bg-gradient-to-r from-vibrantOrange to-amber-500 hover:from-amber-500 hover:to-vibrantOrange text-slate-950 font-bold rounded-xl shadow-[0_0_25px_rgba(255,85,0,0.4)] hover:scale-105 transition-all text-sm flex items-center justify-center space-x-2"
-        >
-          <Wallet className="w-4 h-4" />
-          <span>Request Payout</span>
-        </button>
+        {/* TOP DIGITAL WALLET HERO SECTION */}
+        <div className="bg-slate-900/90 border border-vibrantOrange/40 p-4 rounded-2xl flex items-center space-x-6 z-10 shadow-inner">
+          <div>
+            <span className="text-xs text-slate-400 font-semibold block">Available Digital Wallet</span>
+            <div className="text-3xl font-black text-white font-outfit">
+              ₹{currentTrainer.walletBalance || 0}
+            </div>
+            <span className="text-[10px] text-emerald-400 font-mono">75% Session Fee Earned</span>
+          </div>
+
+          <button
+            onClick={() => {
+              soundEffects.playClick();
+              setShowWithdrawModal(true);
+            }}
+            className="px-5 py-3 bg-gradient-to-r from-vibrantOrange to-amber-500 text-slate-950 font-bold rounded-xl text-xs shadow-[0_0_15px_rgba(255,85,0,0.4)] hover:scale-105 transition-all flex items-center gap-1.5"
+          >
+            <Wallet className="w-4 h-4" /> Request Payout
+          </button>
+        </div>
       </div>
 
-      {/* 2. DIGITAL WALLET HERO SECTION RIGHT AT TOP */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      {/* ASSIGNED CLIENT BOOKING SLOTS & PAYOUT QUEUE */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         
-        {/* Wallet Balance Hero Card */}
-        <div className="glass-card p-6 rounded-2xl border border-vibrantOrange/50 shadow-2xl relative overflow-hidden bg-gradient-to-br from-slate-900 via-slate-900 to-vibrantOrange/10">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-bold uppercase tracking-wider text-vibrantOrange">Digital Wallet Balance</span>
-            <div className="w-10 h-10 rounded-xl bg-vibrantOrange/20 border border-vibrantOrange/40 text-vibrantOrange flex items-center justify-center shadow-[0_0_15px_rgba(255,85,0,0.3)]">
-              <Wallet className="w-5 h-5" />
-            </div>
-          </div>
-          
-          <div className="text-4xl font-black text-white font-outfit mb-1 drop-shadow-[0_0_10px_rgba(255,85,0,0.3)]">
-            ₹{(trainerProfile?.walletBalance || 0).toLocaleString()}
-          </div>
-          <p className="text-xs text-slate-300 font-medium">Auto-debited on payout request with 12-hr window</p>
-        </div>
+        {/* Booked Client Slots */}
+        <div className="lg:col-span-7 space-y-4">
+          <h3 className="text-xl font-extrabold text-white font-outfit flex items-center gap-2">
+            <Users className="w-5 h-5 text-electricBlue" />
+            <span>Assigned Client Workout Slots ({myBookings.length})</span>
+          </h3>
 
-        {/* 75% Split Total Earnings Card */}
-        <div className="glass-card p-6 rounded-2xl border border-electricBlue/50 shadow-2xl bg-gradient-to-br from-slate-900 via-slate-900 to-electricBlue/10">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-bold uppercase tracking-wider text-electricBlue">Lifetime Earnings (75% Split)</span>
-            <div className="w-10 h-10 rounded-xl bg-electricBlue/20 border border-electricBlue/40 text-electricBlue flex items-center justify-center shadow-[0_0_15px_rgba(0,240,255,0.3)]">
-              <ArrowUpRight className="w-5 h-5" />
-            </div>
-          </div>
-          
-          <div className="text-4xl font-black text-electricBlue font-outfit mb-1 drop-shadow-[0_0_10px_rgba(0,240,255,0.3)]">
-            ₹{totalTrainerEarnings.toLocaleString()}
-          </div>
-          <p className="text-xs text-slate-300">75% automatic split per session (₹150 / ₹200 slot)</p>
-        </div>
-
-        {/* Total Sessions Card */}
-        <div className="glass-card p-6 rounded-2xl border border-white/10 shadow-xl">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Assigned Client Sessions</span>
-            <div className="w-10 h-10 rounded-xl bg-slate-800 border border-white/10 text-white flex items-center justify-center">
-              <Calendar className="w-5 h-5" />
-            </div>
-          </div>
-          
-          <div className="text-4xl font-black text-white font-outfit mb-1">
-            {totalSessionsCompleted}
-          </div>
-          <p className="text-xs text-slate-400">Booked & verified PT slots</p>
-        </div>
-
-      </div>
-
-      {/* 3. ASSIGNED CLIENT SLOTS & TIMING MANAGER */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        
-        {/* Assigned Booked Client Slots List */}
-        <div className="lg:col-span-2 space-y-6">
-          <h2 className="text-2xl font-bold text-white font-outfit">Assigned Booked Client Slots</h2>
-
-          {assignedBookings.length === 0 ? (
-            <div className="glass-card p-8 text-center rounded-2xl">
-              <Calendar className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-              <p className="text-slate-400 text-sm">No client slots currently assigned.</p>
+          {myBookings.length === 0 ? (
+            <div className="glass-panel p-8 text-center rounded-3xl border border-white/10 space-y-2">
+              <Dumbbell className="w-8 h-8 text-slate-600 mx-auto" />
+              <p className="text-sm font-bold text-white">No active client slot passes booked yet.</p>
+              <p className="text-xs text-slate-400">When clients book your 2-hour workout slots, their passes will appear here in real-time.</p>
             </div>
           ) : (
-            <div className="space-y-4">
-              {assignedBookings.map(b => (
-                <div key={b.bookingId} className="glass-card p-5 rounded-2xl border border-white/10 hover:border-electricBlue/40 transition-all flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="space-y-3">
+              {myBookings.map((b) => (
+                <div 
+                  key={b.bookingId}
+                  className="glass-panel p-4 rounded-2xl border border-white/10 flex items-center justify-between gap-4 hover:border-electricBlue/40 transition-all"
+                >
                   <div className="space-y-1">
-                    <div className="flex items-center space-x-2">
-                      <span className="text-xs font-mono text-electricBlue font-bold bg-electricBlue/10 px-2 py-0.5 rounded border border-electricBlue/30">
-                        #{b.bookingId}
-                      </span>
-                      <h4 className="text-base font-bold text-white">{b.userName}</h4>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-mono font-bold text-electricBlue">{b.bookingId}</span>
+                      <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-400 text-[10px] font-bold">VERIFIED PASS</span>
                     </div>
-
-                    <p className="text-xs text-slate-400">
-                      Phone: <span className="text-slate-200 font-mono">{b.userPhone}</span> • Gym: <span className="text-slate-200 font-semibold">{b.gymName}</span>
+                    <h4 className="text-sm font-bold text-white">{b.userName || 'Client Member'}</h4>
+                    <p className="text-xs text-vibrantOrange font-medium flex items-center gap-1">
+                      <Clock className="w-3.5 h-3.5" /> {b.slotTime}
                     </p>
-
-                    <div className="flex items-center space-x-4 text-xs text-slate-300 pt-1">
-                      <span className="flex items-center"><Calendar className="w-3.5 h-3.5 text-vibrantOrange mr-1" />{b.date}</span>
-                      <span className="flex items-center"><Clock className="w-3.5 h-3.5 text-electricBlue mr-1" />{b.slotTime}</span>
-                    </div>
                   </div>
 
-                  <div className="text-right flex md:flex-col items-center md:items-end justify-between border-t md:border-t-0 border-white/5 pt-3 md:pt-0">
-                    <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/30">
-                      75% Split: +₹{(b.amount || 200) * 0.75}
-                    </span>
-                    <span className="text-[10px] text-slate-400 font-mono mt-1">Ref UTR: {b.txnId}</span>
+                  <div className="text-right">
+                    <span className="text-xs text-slate-400 block">75% Trainer Fee</span>
+                    <span className="text-lg font-black text-emerald-400 font-outfit">₹{(b.amount || 200) * 0.75}</span>
                   </div>
                 </div>
               ))}
@@ -249,169 +192,96 @@ export const TrainerDashboard = () => {
           )}
         </div>
 
-        {/* Working Hours & Timing Requests Manager */}
-        <div className="glass-card p-6 rounded-2xl border border-white/10 space-y-6 h-fit">
-          <div>
-            <h3 className="text-lg font-bold text-white font-outfit">Working Hours & Timings</h3>
-            <p className="text-xs text-slate-400 mt-1">Manage your available 2-hour workout time slots</p>
-          </div>
+        {/* Payout Withdrawal Requests */}
+        <div className="lg:col-span-5 space-y-4">
+          <h3 className="text-xl font-extrabold text-white font-outfit flex items-center gap-2">
+            <Clock className="w-5 h-5 text-vibrantOrange" />
+            <span>12-Hour Withdrawal Requests</span>
+          </h3>
 
-          {timingMsg && (
-            <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-medium">
-              {timingMsg}
+          {myPayouts.length === 0 ? (
+            <div className="glass-panel p-8 text-center rounded-3xl border border-white/10">
+              <p className="text-xs text-slate-400">No pending payout requests.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {myPayouts.map((p) => (
+                <div 
+                  key={p.requestId}
+                  className="glass-panel p-4 rounded-2xl border border-white/10 flex items-center justify-between"
+                >
+                  <div>
+                    <span className="text-xs font-mono font-bold text-vibrantOrange">{p.requestId}</span>
+                    <div className="text-base font-bold text-white">₹{p.amountRequested}</div>
+                    <span className="text-[10px] text-slate-400">12-Hour Approval Process</span>
+                  </div>
+
+                  <span className={`px-2.5 py-1 rounded-xl text-xs font-bold ${
+                    p.status === 'APPROVED' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                  }`}>
+                    {p.status}
+                  </span>
+                </div>
+              ))}
             </div>
           )}
-
-          <div className="space-y-2">
-            {availableTimings.map((slot, index) => (
-              <div key={index} className="flex items-center justify-between p-2.5 bg-slate-950 rounded-xl border border-white/5 text-xs text-slate-200">
-                <span className="font-mono">{slot}</span>
-                <button 
-                  onClick={() => handleRemoveTimingSlot(index)}
-                  className="text-slate-500 hover:text-red-400 transition-colors"
-                >
-                  Remove
-                </button>
-              </div>
-            ))}
-          </div>
-
-          {/* Add New Slot Input */}
-          <div className="flex gap-2">
-            <input
-              type="text"
-              placeholder="e.g. 05:00 PM - 07:00 PM"
-              value={newTimingInput}
-              onChange={(e) => setNewTimingInput(e.target.value)}
-              className="flex-1 bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-electricBlue font-mono"
-            />
-            <button
-              onClick={handleAddTimingSlot}
-              className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition-all"
-            >
-              Add
-            </button>
-          </div>
-
-          <button
-            onClick={handleSaveTimings}
-            className="w-full py-2.5 bg-electricBlue/10 hover:bg-electricBlue text-electricBlue hover:text-slate-950 border border-electricBlue/40 rounded-xl font-bold text-xs transition-all"
-          >
-            Save Available Timings
-          </button>
         </div>
 
       </div>
 
-      {/* 4. WITHDRAWAL REQUESTS HISTORY TABLE */}
-      <div className="glass-card p-6 rounded-2xl border border-white/10 space-y-6">
-        <h2 className="text-xl font-bold text-white font-outfit">Withdrawal Requests & 12-Hour Status Log</h2>
-
-        {payoutRequests.length === 0 ? (
-          <p className="text-slate-500 text-xs text-center py-4">No payout requests submitted yet.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs text-slate-300">
-              <thead className="bg-slate-950 text-slate-400 uppercase font-mono text-[10px]">
-                <tr>
-                  <th className="p-3">Request ID</th>
-                  <th className="p-3">Amount Requested</th>
-                  <th className="p-3">Requested At</th>
-                  <th className="p-3">12-Hour Processing Window</th>
-                  <th className="p-3">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/5">
-                {payoutRequests.map(req => {
-                  const availableTime = new Date(req.availableAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                  return (
-                    <tr key={req.requestId} className="hover:bg-slate-900/50">
-                      <td className="p-3 font-mono font-bold text-electricBlue">#{req.requestId}</td>
-                      <td className="p-3 font-bold text-white">₹{req.amountRequested}</td>
-                      <td className="p-3 text-slate-400">{new Date(req.requestedAt).toLocaleDateString()} {new Date(req.requestedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
-                      <td className="p-3 text-vibrantOrange font-mono flex items-center">
-                        <Hourglass className="w-3.5 h-3.5 mr-1" />
-                        Available by {availableTime}
-                      </td>
-                      <td className="p-3">
-                        {req.status === 'APPROVED' ? (
-                          <span className="px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-bold">
-                            APPROVED
-                          </span>
-                        ) : (
-                          <span className="px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400 font-bold">
-                            12-HR PROCESSING
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
       {/* WITHDRAWAL MODAL */}
-      {withdrawModalOpen && (
-        <div className="fixed inset-0 z-[9990] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn">
-          <div className="relative w-full max-w-md bg-slate-900 border border-vibrantOrange/40 rounded-2xl p-6 shadow-2xl space-y-4">
-            
-            <h3 className="text-xl font-bold text-white font-outfit">Request Wallet Withdrawal</h3>
-            <p className="text-xs text-slate-400">
-              Available Digital Wallet Balance: <strong className="text-vibrantOrange">₹{trainerProfile?.walletBalance || 0}</strong>
-            </p>
+      {showWithdrawModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="glass-panel max-w-md w-full rounded-3xl border border-vibrantOrange/40 p-6 space-y-4 shadow-2xl relative">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <h3 className="text-xl font-extrabold text-white font-outfit">
+                Request Wallet Payout
+              </h3>
+              <button onClick={() => setShowWithdrawModal(false)} className="text-slate-400 hover:text-white">✕</button>
+            </div>
 
-            {withdrawError && (
-              <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-medium">
-                {withdrawError}
-              </div>
-            )}
-
-            {withdrawSuccess && (
-              <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-medium">
-                {withdrawSuccess}
-              </div>
-            )}
-
-            <form onSubmit={handleWithdrawSubmit} className="space-y-4">
+            <form onSubmit={handleWithdrawRequest} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Amount to Withdraw (₹)</label>
+                <label className="text-xs text-slate-300 block mb-1">Available Wallet Balance</label>
+                <div className="text-2xl font-black text-emerald-400 font-outfit">
+                  ₹{currentTrainer.walletBalance || 0}
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs text-slate-300 block mb-1">Amount to Withdraw (₹)</label>
                 <input
                   type="number"
-                  required
-                  min="1"
-                  max={trainerProfile?.walletBalance || 0}
                   value={withdrawAmount}
                   onChange={(e) => setWithdrawAmount(e.target.value)}
                   placeholder="e.g. 300"
-                  className="w-full bg-slate-950 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-vibrantOrange font-mono"
+                  max={currentTrainer.walletBalance || 0}
+                  className="w-full bg-slate-900 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-vibrantOrange"
                 />
               </div>
 
-              <div className="p-3 bg-slate-950 rounded-xl border border-white/5 text-[11px] text-slate-400 space-y-1">
-                <div>• Auto-debits your digital wallet balance immediately.</div>
-                <div>• Initiates a mandatory 12-hour payout window for Owner Snehith's approval.</div>
+              <div className="bg-slate-900/90 p-3 rounded-xl border border-white/5 text-[11px] text-slate-400 flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-vibrantOrange flex-shrink-0" />
+                <span>Withdrawal requests take up to 12 hours for Owner approval & UPI transfer.</span>
               </div>
 
-              <div className="flex gap-3">
+              <div className="flex justify-end gap-2 pt-2">
                 <button
                   type="button"
-                  onClick={() => { soundEffects.playClick(); setWithdrawModalOpen(false); }}
-                  className="flex-1 py-2.5 bg-slate-800 text-slate-300 font-bold rounded-xl text-xs"
+                  onClick={() => setShowWithdrawModal(false)}
+                  className="px-4 py-2 text-slate-400 text-xs hover:text-white"
                 >
                   Cancel
                 </button>
+
                 <button
                   type="submit"
-                  className="flex-1 py-2.5 bg-gradient-to-r from-vibrantOrange to-amber-500 text-slate-950 font-bold rounded-xl text-xs shadow-lg"
+                  className="px-6 py-2.5 bg-vibrantOrange text-slate-950 font-bold rounded-xl text-xs shadow-[0_0_15px_#ff5500]"
                 >
                   Submit Payout Request
                 </button>
               </div>
             </form>
-
           </div>
         </div>
       )}
