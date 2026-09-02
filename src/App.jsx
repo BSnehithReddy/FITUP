@@ -11,24 +11,21 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 const MainContent = () => {
   const { currentUser } = useAuth();
   const [activeTab, setActiveTab] = useState(() => {
-    // If logged in as owner, default to owner_dash, trainer to trainer_dash, else home
     const saved = localStorage.getItem("fitup_user_session");
     if (saved) {
       try {
         const u = JSON.parse(saved);
-        if (u?.role === 'owner') return 'owner_dash';
+        if (u?.phone === '9030118909' && u?.role === 'owner') return 'owner_dash';
         if (u?.role === 'trainer') return 'trainer_dash';
       } catch (e) {}
     }
     return 'home';
   });
 
-  // Keep active tab in sync if user changes role
+  // Keep active tab in sync if user changes role or logs out
   useEffect(() => {
-    if (currentUser?.role === 'owner' && activeTab !== 'owner_dash' && activeTab !== 'home' && activeTab !== 'my_bookings') {
-      setActiveTab('owner_dash');
-    } else if (currentUser?.role === 'trainer' && activeTab !== 'trainer_dash' && activeTab !== 'home' && activeTab !== 'my_bookings') {
-      setActiveTab('trainer_dash');
+    if (activeTab === 'owner_dash' && (currentUser?.phone !== '9030118909' || currentUser?.role !== 'owner')) {
+      setActiveTab('home');
     }
   }, [currentUser]);
 
@@ -50,7 +47,7 @@ const MainContent = () => {
           )}
 
           {activeTab === 'owner_dash' && (
-            <OwnerDashboard />
+            <OwnerDashboard setActiveTab={setActiveTab} />
           )}
         </ErrorBoundary>
       </main>

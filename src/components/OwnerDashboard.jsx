@@ -7,7 +7,8 @@ import {
   Building2, Users, Wallet, Plus, Trash2, Edit, CheckCircle2, 
   Clock, ArrowUpRight, ShieldCheck, Sparkles, Image as ImageIcon, 
   QrCode, RefreshCw, Lock, Unlock, TrendingUp, BarChart3, 
-  DollarSign, Activity, AlertTriangle, ShieldAlert, Star
+  DollarSign, Activity, AlertTriangle, ShieldAlert, Star,
+  ShieldX, ArrowLeft
 } from 'lucide-react';
 
 const PRESET_GYM_IMAGES = [
@@ -33,11 +34,40 @@ const AVAILABLE_SLOT_OPTIONS = [
   "08:00 PM - 10:00 PM"
 ];
 
-export const OwnerDashboard = () => {
+export const OwnerDashboard = ({ setActiveTab }) => {
   const { currentUser } = useAuth();
   
-  // Super Admin Check (Phone: 9030118909)
-  const isSuperAdmin = currentUser?.phone === "9030118909" && currentUser?.role === "owner";
+  // Strict Master Admin Check (Phone: 9030118909 & role: owner)
+  const isMasterAdmin = currentUser?.phone === "9030118909" && currentUser?.role === "owner";
+
+  // ROUTE GUARD PROTECTION: If not Master Admin, block rendering and show Access Denied
+  if (!isMasterAdmin) {
+    return (
+      <div className="min-h-[500px] flex items-center justify-center p-6">
+        <div className="glass-panel max-w-md w-full rounded-3xl border border-rose-500/40 p-8 text-center space-y-6 shadow-2xl bg-gradient-to-b from-slate-900 to-slate-950">
+          <div className="w-16 h-16 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-400 flex items-center justify-center mx-auto shadow-[0_0_20px_rgba(244,63,94,0.3)]">
+            <ShieldAlert className="w-8 h-8" />
+          </div>
+
+          <div className="space-y-2">
+            <h2 className="text-2xl font-extrabold text-white font-outfit">
+              Access Restricted
+            </h2>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              The Master Owner Console is strictly restricted to Master Admin Snehith (<span className="text-electricBlue font-mono">9030118909</span>).
+            </p>
+          </div>
+
+          <button
+            onClick={() => setActiveTab && setActiveTab('home')}
+            className="w-full py-3 bg-gradient-to-r from-electricBlue to-blue-500 text-slate-950 font-bold rounded-xl text-xs shadow-[0_0_15px_#00f0ff] hover:scale-105 transition-all flex items-center justify-center gap-2"
+          >
+            <ArrowLeft className="w-4 h-4" /> Return to Explore Gyms
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const [isLoading, setIsLoading] = useState(true);
   const [gyms, setGyms] = useState([]);
@@ -208,12 +238,6 @@ export const OwnerDashboard = () => {
       return;
     }
 
-    if (editingGym && gymForm.startingPrice !== editingGym.startingPrice && !isSuperAdmin) {
-      soundEffects.playError();
-      alert("Security Lock: Only Super Admin Snehith (9030118909) can modify trial slot fees.");
-      return;
-    }
-
     await firestoreService.saveGym({
       ...gymForm,
       gymId: editingGym ? editingGym.gymId : null,
@@ -374,15 +398,9 @@ export const OwnerDashboard = () => {
             <span className="text-xs font-bold tracking-[0.25em] text-electricBlue uppercase flex items-center gap-1.5">
               <ShieldCheck className="w-4 h-4 text-electricBlue" /> Master Admin Console
             </span>
-            {isSuperAdmin ? (
-              <span className="px-2.5 py-0.5 rounded-md bg-amber-400/20 text-amber-300 text-[10px] font-mono font-bold flex items-center gap-1 border border-amber-400/30">
-                <Unlock className="w-3 h-3" /> Super Admin Snehith
-              </span>
-            ) : (
-              <span className="px-2.5 py-0.5 rounded-md bg-slate-800 text-slate-400 text-[10px] font-mono flex items-center gap-1">
-                <Lock className="w-3 h-3" /> Standard Staff
-              </span>
-            )}
+            <span className="px-2.5 py-0.5 rounded-md bg-amber-400/20 text-amber-300 text-[10px] font-mono font-bold flex items-center gap-1 border border-amber-400/30">
+              <Unlock className="w-3 h-3" /> Super Admin Snehith
+            </span>
           </div>
           <h1 className="text-3xl font-extrabold text-white font-outfit mt-1">
             Platform Operations & Financial Analytics
@@ -758,7 +776,7 @@ export const OwnerDashboard = () => {
         )}
       </div>
 
-      {/* GYM MODAL WITH SUPER ADMIN PRICE LOCK */}
+      {/* GYM MODAL */}
       {showGymModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
           <div className="glass-panel max-w-lg w-full rounded-3xl border border-electricBlue/40 p-6 space-y-4 shadow-2xl relative max-h-[90vh] overflow-y-auto">
@@ -825,44 +843,21 @@ export const OwnerDashboard = () => {
                 </div>
               </div>
 
-              {/* TRIAL SLOT FEE (WITH SUPER ADMIN LOCK) */}
+              {/* TRIAL SLOT FEE */}
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="text-slate-300 font-bold">2-Hour Trial Slot Fee (₹)</label>
-                  {isSuperAdmin ? (
-                    <span className="text-[10px] text-emerald-400 font-mono font-bold flex items-center gap-1">
-                      <Unlock className="w-3 h-3" /> Unlocked (Super Admin)
-                    </span>
-                  ) : (
-                    <span className="text-[10px] text-amber-400 font-mono font-bold flex items-center gap-1 bg-amber-400/10 px-2 py-0.5 rounded-md border border-amber-400/20">
-                      <Lock className="w-3 h-3" /> Locked by Super Admin Snehith
-                    </span>
-                  )}
+                  <span className="text-[10px] text-emerald-400 font-mono font-bold flex items-center gap-1">
+                    <Unlock className="w-3 h-3" /> Unlocked (Super Admin)
+                  </span>
                 </div>
 
-                <div className="relative">
-                  <input
-                    type="number"
-                    disabled={!isSuperAdmin}
-                    value={gymForm.startingPrice}
-                    onChange={(e) => setGymForm({ ...gymForm, startingPrice: Number(e.target.value) })}
-                    className={`w-full border rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none font-mono ${
-                      isSuperAdmin 
-                        ? 'bg-slate-900 border-electricBlue focus:border-electricBlue' 
-                        : 'bg-slate-950 border-white/5 cursor-not-allowed opacity-70'
-                    }`}
-                  />
-                  {!isSuperAdmin && (
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500">
-                      <Lock className="w-4 h-4" />
-                    </div>
-                  )}
-                </div>
-                {!isSuperAdmin && (
-                  <p className="text-[10px] text-slate-500 mt-1">
-                    Only Master Admin Snehith (9030118909) has authority to adjust official session rates.
-                  </p>
-                )}
+                <input
+                  type="number"
+                  value={gymForm.startingPrice}
+                  onChange={(e) => setGymForm({ ...gymForm, startingPrice: Number(e.target.value) })}
+                  className="w-full bg-slate-900 border border-electricBlue rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none font-mono"
+                />
               </div>
 
               <div className="flex justify-end gap-2 pt-2">

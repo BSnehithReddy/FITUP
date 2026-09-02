@@ -6,6 +6,9 @@ import { Dumbbell, Shield, User, LogOut, Ticket, LayoutDashboard, Search, Sparkl
 export const Navbar = ({ activeTab, setActiveTab }) => {
   const { currentUser, openAuthModal, logout } = useAuth();
 
+  // Strict Master Admin check (Phone: 9030118909 and role: owner)
+  const isMasterAdmin = currentUser?.phone === '9030118909' && currentUser?.role === 'owner';
+
   return (
     <header className="sticky top-0 z-50 glass-panel border-b border-white/10 shadow-2xl">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
@@ -69,7 +72,8 @@ export const Navbar = ({ activeTab, setActiveTab }) => {
             </button>
           )}
 
-          {currentUser?.role === 'owner' && (
+          {/* Conditional Owner Console - ONLY VISIBLE TO MASTER ADMIN SNEHITH (9030118909) */}
+          {isMasterAdmin && (
             <button
               onClick={() => setActiveTab('owner_dash')}
               className={`flex items-center space-x-1.5 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all ${
@@ -98,8 +102,11 @@ export const Navbar = ({ activeTab, setActiveTab }) => {
                   {currentUser.name}
                 </div>
                 <div className="text-[10px] uppercase font-bold tracking-wider">
-                  {currentUser.role === 'owner' && (
+                  {isMasterAdmin && (
                     <span className="text-electricBlue">Master Admin</span>
+                  )}
+                  {!isMasterAdmin && currentUser.role === 'owner' && (
+                    <span className="text-slate-400">Gym Partner</span>
                   )}
                   {currentUser.role === 'trainer' && (
                     <span className="text-vibrantOrange">Trainer Pro</span>
