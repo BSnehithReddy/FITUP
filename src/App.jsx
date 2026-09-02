@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { IntroSplash } from './components/IntroSplash';
 import { Navbar } from './components/Navbar';
@@ -6,10 +6,31 @@ import { AuthModal } from './components/AuthModal';
 import { ClientDashboard } from './components/ClientDashboard';
 import { TrainerDashboard } from './components/TrainerDashboard';
 import { OwnerDashboard } from './components/OwnerDashboard';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 const MainContent = () => {
   const { currentUser } = useAuth();
-  const [activeTab, setActiveTab] = useState('home'); // "home" | "my_bookings" | "trainer_dash" | "owner_dash"
+  const [activeTab, setActiveTab] = useState(() => {
+    // If logged in as owner, default to owner_dash, trainer to trainer_dash, else home
+    const saved = localStorage.getItem("fitup_user_session");
+    if (saved) {
+      try {
+        const u = JSON.parse(saved);
+        if (u?.role === 'owner') return 'owner_dash';
+        if (u?.role === 'trainer') return 'trainer_dash';
+      } catch (e) {}
+    }
+    return 'home';
+  });
+
+  // Keep active tab in sync if user changes role
+  useEffect(() => {
+    if (currentUser?.role === 'owner' && activeTab !== 'owner_dash' && activeTab !== 'home' && activeTab !== 'my_bookings') {
+      setActiveTab('owner_dash');
+    } else if (currentUser?.role === 'trainer' && activeTab !== 'trainer_dash' && activeTab !== 'home' && activeTab !== 'my_bookings') {
+      setActiveTab('trainer_dash');
+    }
+  }, [currentUser]);
 
   return (
     <div className="min-h-screen bg-[#070b19] text-gray-100 flex flex-col selection:bg-electricBlue/30 selection:text-electricBlue">
@@ -17,19 +38,21 @@ const MainContent = () => {
       {/* Navigation Bar */}
       <Navbar activeTab={activeTab} setActiveTab={setActiveTab} />
 
-      {/* Main View Router */}
+      {/* Main View Router with Protective Error Boundary */}
       <main className="flex-1 pb-16">
-        {(activeTab === 'home' || activeTab === 'my_bookings') && (
-          <ClientDashboard activeTab={activeTab} setActiveTab={setActiveTab} />
-        )}
+        <ErrorBoundary>
+          {(activeTab === 'home' || activeTab === 'my_bookings') && (
+            <ClientDashboard activeTab={activeTab} setActiveTab={setActiveTab} />
+          )}
 
-        {activeTab === 'trainer_dash' && (
-          <TrainerDashboard />
-        )}
+          {activeTab === 'trainer_dash' && (
+            <TrainerDashboard />
+          )}
 
-        {activeTab === 'owner_dash' && (
-          <OwnerDashboard />
-        )}
+          {activeTab === 'owner_dash' && (
+            <OwnerDashboard />
+          )}
+        </ErrorBoundary>
       </main>
 
       {/* Footer */}
@@ -53,12 +76,14 @@ export default function App() {
   const [showIntro, setShowIntro] = useState(true);
 
   return (
-    <AuthProvider>
-      {showIntro ? (
-        <IntroSplash onFinish={() => setShowIntro(false)} />
-      ) : (
-        <MainContent />
-      )}
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        {showIntro ? (
+          <IntroSplash onFinish={() => setShowIntro(false)} />
+        ) : (
+          <MainContent />
+        )}
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }

@@ -7,7 +7,7 @@ import {
   Building2, Users, Wallet, Plus, Trash2, Edit, CheckCircle2, 
   Clock, ArrowUpRight, ShieldCheck, Sparkles, Image as ImageIcon, 
   QrCode, RefreshCw, Lock, Unlock, TrendingUp, BarChart3, 
-  DollarSign, Activity, AlertTriangle
+  DollarSign, Activity, AlertTriangle, ShieldAlert
 } from 'lucide-react';
 
 const PRESET_GYM_IMAGES = [
@@ -39,11 +39,11 @@ export const OwnerDashboard = () => {
   // Super Admin Check (Phone: 9030118909)
   const isSuperAdmin = currentUser?.phone === "9030118909" && currentUser?.role === "owner";
 
-  const [gyms, setGyms] = useState([]);
-  const [trainers, setTrainers] = useState([]);
-  const [bookings, setBookings] = useState([]);
-  const [payoutRequests, setPayoutRequests] = useState([]);
-  const [ownerConfig, setOwnerConfig] = useState({ ownerUpiId: '', ownerQrCodeUrl: '', razorpayKeyId: '' });
+  const [gyms, setGyms] = useState(() => firestoreService.getGymsSync() || []);
+  const [trainers, setTrainers] = useState(() => firestoreService.getTrainersSync() || []);
+  const [bookings, setBookings] = useState(() => firestoreService.getBookingsSync() || []);
+  const [payoutRequests, setPayoutRequests] = useState(() => firestoreService.getPayoutRequestsSync() || []);
+  const [ownerConfig, setOwnerConfig] = useState(() => firestoreService.getOwnerConfigSync() || { ownerUpiId: '9030118909@ybl', ownerQrCodeUrl: '', razorpayKeyId: 'rzp_test_FITUPDemoKey' });
   const [isSyncing, setIsSyncing] = useState(false);
 
   // Modals State
@@ -62,37 +62,57 @@ export const OwnerDashboard = () => {
   });
 
   const [upiForm, setUpiForm] = useState({
-    ownerUpiId: '', ownerQrCodeUrl: '', razorpayKeyId: ''
+    ownerUpiId: ownerConfig?.ownerUpiId || '9030118909@ybl',
+    ownerQrCodeUrl: ownerConfig?.ownerQrCodeUrl || '',
+    razorpayKeyId: ownerConfig?.razorpayKeyId || 'rzp_test_FITUPDemoKey'
   });
 
   const [toastMessage, setToastMessage] = useState(null);
 
-  // Real-Time Subscriptions
+  // Safe Real-Time Subscriptions
   useEffect(() => {
-    const unsubGyms = firestoreService.subscribeGyms(setGyms);
-    const unsubTrainers = firestoreService.subscribeTrainers(setTrainers);
-    const unsubBookings = firestoreService.subscribeBookings(setBookings);
-    const unsubPayouts = firestoreService.getPayoutRequestsSync ? () => setPayoutRequests(firestoreService.getPayoutRequestsSync()) : () => {};
+    let isMounted = true;
+
+    const unsubGyms = firestoreService.subscribeGyms((data) => {
+      if (isMounted && Array.isArray(data)) setGyms(data);
+    });
+
+    const unsubTrainers = firestoreService.subscribeTrainers((data) => {
+      if (isMounted && Array.isArray(data)) setTrainers(data);
+    });
+
+    const unsubBookings = firestoreService.subscribeBookings((data) => {
+      if (isMounted && Array.isArray(data)) setBookings(data);
+    });
+
     const unsubConfig = firestoreService.subscribeOwnerConfig((cfg) => {
-      setOwnerConfig(cfg);
-      setUpiForm({ 
-        ownerUpiId: cfg.ownerUpiId || '', 
-        ownerQrCodeUrl: cfg.ownerQrCodeUrl || '',
-        razorpayKeyId: cfg.razorpayKeyId || 'rzp_test_FITUPDemoKey'
-      });
+      if (isMounted && cfg) {
+        setOwnerConfig(cfg);
+        setUpiForm({ 
+          ownerUpiId: cfg.ownerUpiId || '9030118909@ybl', 
+          ownerQrCodeUrl: cfg.ownerQrCodeUrl || '',
+          razorpayKeyId: cfg.razorpayKeyId || 'rzp_test_FITUPDemoKey'
+        });
+      }
     });
 
     const handleSync = () => {
-      setGyms(firestoreService.getGymsSync());
-      setTrainers(firestoreService.getTrainersSync());
-      setBookings(firestoreService.getBookingsSync());
-      setPayoutRequests(firestoreService.getPayoutRequestsSync());
-      const cfg = firestoreService.getOwnerConfigSync();
-      setOwnerConfig(cfg);
+      if (!isMounted) return;
+      try {
+        setGyms(firestoreService.getGymsSync() || []);
+        setTrainers(firestoreService.getTrainersSync() || []);
+        setBookings(firestoreService.getBookingsSync() || []);
+        setPayoutRequests(firestoreService.getPayoutRequestsSync() || []);
+        const cfg = firestoreService.getOwnerConfigSync();
+        if (cfg) setOwnerConfig(cfg);
+      } catch (e) {
+        console.warn("Owner sync caught error:", e);
+      }
     };
 
     window.addEventListener('fitup_data_sync', handleSync);
     return () => {
+      isMounted = false;
       if (typeof unsubGyms === 'function') unsubGyms();
       if (typeof unsubTrainers === 'function') unsubTrainers();
       if (typeof unsubBookings === 'function') unsubBookings();
@@ -125,12 +145,12 @@ export const OwnerDashboard = () => {
     if (gym) {
       setEditingGym(gym);
       setGymForm({
-        name: gym.name,
-        location: gym.location,
+        name: gym.name || '',
+        location: gym.location || '',
         address: gym.address || '',
         image: gym.image || PRESET_GYM_IMAGES[0].url,
         startingPrice: gym.startingPrice || 280,
-        amenities: gym.amenities || ['AC']
+        amenities: gym.amenities || ['AC', 'Free Locker']
       });
     } else {
       setEditingGym(null);
@@ -161,8 +181,8 @@ export const OwnerDashboard = () => {
       gymId: editingGym ? editingGym.gymId : null,
       rating: editingGym ? editingGym.rating : 4.9,
       reviewCount: editingGym ? editingGym.reviewCount : 40,
-      ownerUpiId: ownerConfig.ownerUpiId,
-      ownerQrCodeUrl: ownerConfig.ownerQrCodeUrl
+      ownerUpiId: ownerConfig?.ownerUpiId || '9030118909@ybl',
+      ownerQrCodeUrl: ownerConfig?.ownerQrCodeUrl || ''
     }, currentUser);
 
     setShowGymModal(false);
@@ -180,14 +200,14 @@ export const OwnerDashboard = () => {
   // TRAINER CRUD
   const handleOpenTrainerModal = (trainer = null) => {
     soundEffects.playClick();
-    const defaultGymId = gyms.length > 0 ? gyms[0].gymId : '';
+    const defaultGymId = (gyms && gyms.length > 0) ? gyms[0].gymId : 'gym-1';
     if (trainer) {
       setEditingTrainer(trainer);
       setTrainerForm({
-        name: trainer.name,
-        phone: trainer.phone,
+        name: trainer.name || '',
+        phone: trainer.phone || '',
         password: trainer.password || 'Trainer@123',
-        gymId: trainer.gymId,
+        gymId: trainer.gymId || defaultGymId,
         price: trainer.price || 280,
         specialization: trainer.specialization || 'Strength & Conditioning',
         experience: trainer.experience || '5+ Years',
@@ -260,8 +280,12 @@ export const OwnerDashboard = () => {
     showToast("Payout Request Approved!");
   };
 
-  // Financial Analytics Calculations
-  const grossRevenue = bookings.reduce((sum, b) => b.status === 'VERIFIED' ? sum + (b.amount || 280) : sum, 0);
+  // Safe Financial Analytics Calculations
+  const grossRevenue = useMemo(() => {
+    if (!Array.isArray(bookings)) return 0;
+    return bookings.reduce((sum, b) => b.status === 'VERIFIED' ? sum + (b.amount || 280) : sum, 0);
+  }, [bookings]);
+
   const netOwnerShare = grossRevenue * 0.25;
   const trainerSplitShare = grossRevenue * 0.75;
 
@@ -269,11 +293,12 @@ export const OwnerDashboard = () => {
   const peakStats = useMemo(() => {
     let morning = 0;
     let evening = 0;
-    bookings.forEach(b => {
-      if (b.slotTime?.includes('AM')) morning++;
+    const list = Array.isArray(bookings) ? bookings : [];
+    list.forEach(b => {
+      if (b?.slotTime?.includes('AM')) morning++;
       else evening++;
     });
-    return { morning, evening, total: bookings.length || 1 };
+    return { morning, evening, total: list.length || 1 };
   }, [bookings]);
 
   return (
@@ -292,18 +317,20 @@ export const OwnerDashboard = () => {
         <div className="absolute top-0 right-0 w-96 h-96 bg-electricBlue/10 rounded-full blur-3xl pointer-events-none" />
 
         <div>
-          <span className="text-xs font-bold tracking-[0.25em] text-electricBlue uppercase flex items-center gap-1.5">
-            <ShieldCheck className="w-4 h-4 text-electricBlue" /> Master Admin Console
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold tracking-[0.25em] text-electricBlue uppercase flex items-center gap-1.5">
+              <ShieldCheck className="w-4 h-4 text-electricBlue" /> Master Admin Console
+            </span>
             {isSuperAdmin ? (
-              <span className="px-2 py-0.5 rounded-md bg-amber-400/20 text-amber-300 text-[10px] font-mono font-bold flex items-center gap-1 border border-amber-400/30">
-                <Unlock className="w-3 h-3" /> Super Admin (Snehith)
+              <span className="px-2.5 py-0.5 rounded-md bg-amber-400/20 text-amber-300 text-[10px] font-mono font-bold flex items-center gap-1 border border-amber-400/30">
+                <Unlock className="w-3 h-3" /> Super Admin Snehith
               </span>
             ) : (
-              <span className="px-2 py-0.5 rounded-md bg-slate-800 text-slate-400 text-[10px] font-mono flex items-center gap-1">
+              <span className="px-2.5 py-0.5 rounded-md bg-slate-800 text-slate-400 text-[10px] font-mono flex items-center gap-1">
                 <Lock className="w-3 h-3" /> Standard Staff
               </span>
             )}
-          </span>
+          </div>
           <h1 className="text-3xl font-extrabold text-white font-outfit mt-1">
             Platform Operations & Financial Analytics
           </h1>
@@ -361,7 +388,7 @@ export const OwnerDashboard = () => {
 
         <div className="glass-panel p-5 rounded-3xl border border-white/10 space-y-2">
           <span className="text-xs text-slate-400 font-medium">Total Passes Issued</span>
-          <div className="text-3xl font-black text-white font-outfit">{bookings.length}</div>
+          <div className="text-3xl font-black text-white font-outfit">{(bookings || []).length}</div>
           <span className="text-[10px] text-electricBlue font-mono">Live Firestore Count</span>
         </div>
       </div>
@@ -388,12 +415,10 @@ export const OwnerDashboard = () => {
                   <stop offset="100%" stopColor="#00f0ff" stopOpacity="0" />
                 </linearGradient>
               </defs>
-              {/* Area Gradient */}
               <path
                 d="M 0 110 Q 80 80, 160 90 T 320 40 T 500 20 L 500 120 L 0 120 Z"
                 fill="url(#chartGlow)"
               />
-              {/* Glowing Line */}
               <path
                 d="M 0 110 Q 80 80, 160 90 T 320 40 T 500 20"
                 fill="none"
@@ -401,7 +426,6 @@ export const OwnerDashboard = () => {
                 strokeWidth="4"
                 className="drop-shadow-[0_0_10px_#00f0ff]"
               />
-              {/* Data Points */}
               <circle cx="160" cy="90" r="5" fill="#ff5500" stroke="#fff" strokeWidth="2" />
               <circle cx="320" cy="40" r="5" fill="#34d399" stroke="#fff" strokeWidth="2" />
               <circle cx="500" cy="20" r="6" fill="#00f0ff" stroke="#fff" strokeWidth="2" />
@@ -469,7 +493,7 @@ export const OwnerDashboard = () => {
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-bold text-white font-outfit flex items-center gap-2">
               <Building2 className="w-5 h-5 text-electricBlue" />
-              <span>Partner Gyms ({gyms.length})</span>
+              <span>Partner Gyms ({(gyms || []).length})</span>
             </h3>
 
             <button
@@ -481,7 +505,7 @@ export const OwnerDashboard = () => {
           </div>
 
           <div className="space-y-3">
-            {gyms.map((g) => (
+            {(gyms || []).map((g) => (
               <div 
                 key={g.gymId}
                 className="glass-panel p-4 rounded-2xl border border-white/10 flex items-center justify-between gap-4 hover:border-electricBlue/40 transition-all"
@@ -530,7 +554,7 @@ export const OwnerDashboard = () => {
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-bold text-white font-outfit flex items-center gap-2">
               <Users className="w-5 h-5 text-vibrantOrange" />
-              <span>Trainers ({trainers.length})</span>
+              <span>Trainers ({(trainers || []).length})</span>
             </h3>
 
             <button
@@ -542,8 +566,8 @@ export const OwnerDashboard = () => {
           </div>
 
           <div className="space-y-3">
-            {trainers.map((t) => {
-              const belongingGym = gyms.find(g => g.gymId === t.gymId);
+            {(trainers || []).map((t) => {
+              const belongingGym = (gyms || []).find(g => g.gymId === t.gymId);
               return (
                 <div 
                   key={t.trainerId}
@@ -634,7 +658,7 @@ export const OwnerDashboard = () => {
           <span>Trainer 12-Hour Payout Approval Queue</span>
         </h3>
 
-        {payoutRequests.length === 0 ? (
+        {(!payoutRequests || payoutRequests.length === 0) ? (
           <p className="text-xs text-slate-500 italic">No payout requests pending.</p>
         ) : (
           <div className="overflow-x-auto">
@@ -649,7 +673,7 @@ export const OwnerDashboard = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
-                {payoutRequests.map((req) => (
+                {(payoutRequests || []).map((req) => (
                   <tr key={req.requestId} className="hover:bg-slate-900/50">
                     <td className="p-3 font-mono font-bold text-electricBlue">{req.requestId}</td>
                     <td className="p-3 font-bold text-white">{req.trainerName}</td>
@@ -725,7 +749,6 @@ export const OwnerDashboard = () => {
                   className="w-full bg-slate-900 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-electricBlue mb-2"
                 />
 
-                {/* 1-Click Preset Buttons */}
                 <div className="flex flex-wrap gap-1.5 mb-3">
                   {PRESET_GYM_IMAGES.map((preset, i) => (
                     <button
@@ -840,7 +863,7 @@ export const OwnerDashboard = () => {
                   onChange={(e) => setTrainerForm({ ...trainerForm, gymId: e.target.value })}
                   className="w-full bg-slate-900 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-vibrantOrange"
                 >
-                  {gyms.map(g => (
+                  {(gyms || []).map(g => (
                     <option key={g.gymId} value={g.gymId}>{g.name} ({g.location})</option>
                   ))}
                 </select>
