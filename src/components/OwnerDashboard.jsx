@@ -1,10 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { firestoreService } from '../services/firestoreService';
 import { soundEffects } from '../services/soundEffects';
 import { SafeImage } from './SafeImage';
+import { useAuth } from '../context/AuthContext';
 import { 
   Building2, Users, Wallet, Plus, Trash2, Edit, CheckCircle2, 
-  Clock, ArrowUpRight, ShieldCheck, Sparkles, Image as ImageIcon, QrCode, RefreshCw
+  Clock, ArrowUpRight, ShieldCheck, Sparkles, Image as ImageIcon, 
+  QrCode, RefreshCw, Lock, Unlock, TrendingUp, BarChart3, 
+  DollarSign, Activity, AlertTriangle
 } from 'lucide-react';
 
 const PRESET_GYM_IMAGES = [
@@ -31,11 +34,16 @@ const AVAILABLE_SLOT_OPTIONS = [
 ];
 
 export const OwnerDashboard = () => {
+  const { currentUser } = useAuth();
+  
+  // Super Admin Check (Phone: 9030118909)
+  const isSuperAdmin = currentUser?.phone === "9030118909" && currentUser?.role === "owner";
+
   const [gyms, setGyms] = useState([]);
   const [trainers, setTrainers] = useState([]);
   const [bookings, setBookings] = useState([]);
   const [payoutRequests, setPayoutRequests] = useState([]);
-  const [ownerConfig, setOwnerConfig] = useState({ ownerUpiId: '', ownerQrCodeUrl: '' });
+  const [ownerConfig, setOwnerConfig] = useState({ ownerUpiId: '', ownerQrCodeUrl: '', razorpayKeyId: '' });
   const [isSyncing, setIsSyncing] = useState(false);
 
   // Modals State
@@ -54,32 +62,49 @@ export const OwnerDashboard = () => {
   });
 
   const [upiForm, setUpiForm] = useState({
-    ownerUpiId: '', ownerQrCodeUrl: ''
+    ownerUpiId: '', ownerQrCodeUrl: '', razorpayKeyId: ''
   });
 
   const [toastMessage, setToastMessage] = useState(null);
 
-  const loadData = () => {
-    setGyms(firestoreService.getGymsSync());
-    setTrainers(firestoreService.getTrainersSync());
-    setBookings(firestoreService.getBookingsSync());
-    setPayoutRequests(firestoreService.getPayoutRequestsSync());
-    const cfg = firestoreService.getOwnerConfigSync();
-    setOwnerConfig(cfg);
-    setUpiForm({ ownerUpiId: cfg.ownerUpiId || '', ownerQrCodeUrl: cfg.ownerQrCodeUrl || '' });
-  };
-
+  // Real-Time Subscriptions
   useEffect(() => {
-    loadData();
-    const handleSync = () => loadData();
+    const unsubGyms = firestoreService.subscribeGyms(setGyms);
+    const unsubTrainers = firestoreService.subscribeTrainers(setTrainers);
+    const unsubBookings = firestoreService.subscribeBookings(setBookings);
+    const unsubPayouts = firestoreService.getPayoutRequestsSync ? () => setPayoutRequests(firestoreService.getPayoutRequestsSync()) : () => {};
+    const unsubConfig = firestoreService.subscribeOwnerConfig((cfg) => {
+      setOwnerConfig(cfg);
+      setUpiForm({ 
+        ownerUpiId: cfg.ownerUpiId || '', 
+        ownerQrCodeUrl: cfg.ownerQrCodeUrl || '',
+        razorpayKeyId: cfg.razorpayKeyId || 'rzp_test_FITUPDemoKey'
+      });
+    });
+
+    const handleSync = () => {
+      setGyms(firestoreService.getGymsSync());
+      setTrainers(firestoreService.getTrainersSync());
+      setBookings(firestoreService.getBookingsSync());
+      setPayoutRequests(firestoreService.getPayoutRequestsSync());
+      const cfg = firestoreService.getOwnerConfigSync();
+      setOwnerConfig(cfg);
+    };
+
     window.addEventListener('fitup_data_sync', handleSync);
-    return () => window.removeEventListener('fitup_data_sync', handleSync);
+    return () => {
+      if (typeof unsubGyms === 'function') unsubGyms();
+      if (typeof unsubTrainers === 'function') unsubTrainers();
+      if (typeof unsubBookings === 'function') unsubBookings();
+      if (typeof unsubConfig === 'function') unsubConfig();
+      window.removeEventListener('fitup_data_sync', handleSync);
+    };
   }, []);
 
   const showToast = (msg) => {
     soundEffects.playSuccessChime();
     setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3000);
+    setTimeout(() => setToastMessage(null), 3500);
   };
 
   // Master Save & Sync Changes Button Handler
@@ -90,7 +115,7 @@ export const OwnerDashboard = () => {
     setTimeout(() => {
       firestoreService.forceMasterSync();
       setIsSyncing(false);
-      showToast("Pushed & Synced Live to Website!");
+      showToast("Pushed & Synced Live to Firestore & Website!");
     }, 600);
   };
 
@@ -124,16 +149,24 @@ export const OwnerDashboard = () => {
       return;
     }
 
+    // Enforce pricing lock check
+    if (editingGym && gymForm.startingPrice !== editingGym.startingPrice && !isSuperAdmin) {
+      soundEffects.playError();
+      alert("Security Lock: Only Super Admin Snehith (9030118909) can modify trial slot fees.");
+      return;
+    }
+
     await firestoreService.saveGym({
       ...gymForm,
       gymId: editingGym ? editingGym.gymId : null,
       rating: editingGym ? editingGym.rating : 4.9,
+      reviewCount: editingGym ? editingGym.reviewCount : 40,
       ownerUpiId: ownerConfig.ownerUpiId,
       ownerQrCodeUrl: ownerConfig.ownerQrCodeUrl
-    });
+    }, currentUser);
 
     setShowGymModal(false);
-    showToast(editingGym ? "Gym Updated Successfully!" : "New Partner Gym Added!");
+    showToast(editingGym ? "Gym Updated in Firestore!" : "New Partner Gym Added!");
   };
 
   const handleDeleteGym = async (gymId) => {
@@ -218,7 +251,7 @@ export const OwnerDashboard = () => {
     e.preventDefault();
     soundEffects.playClick();
     await firestoreService.updateOwnerConfig(upiForm);
-    showToast("Master Owner UPI Details Saved!");
+    showToast("Master Gateway & UPI Details Saved!");
   };
 
   const handleApprovePayout = async (requestId) => {
@@ -227,10 +260,21 @@ export const OwnerDashboard = () => {
     showToast("Payout Request Approved!");
   };
 
-  // Analytics Calculations
-  const grossRevenue = bookings.reduce((sum, b) => sum + (b.amount || 280), 0);
+  // Financial Analytics Calculations
+  const grossRevenue = bookings.reduce((sum, b) => b.status === 'VERIFIED' ? sum + (b.amount || 280) : sum, 0);
   const netOwnerShare = grossRevenue * 0.25;
   const trainerSplitShare = grossRevenue * 0.75;
+
+  // Peak Hours Distribution
+  const peakStats = useMemo(() => {
+    let morning = 0;
+    let evening = 0;
+    bookings.forEach(b => {
+      if (b.slotTime?.includes('AM')) morning++;
+      else evening++;
+    });
+    return { morning, evening, total: bookings.length || 1 };
+  }, [bookings]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
@@ -249,18 +293,27 @@ export const OwnerDashboard = () => {
 
         <div>
           <span className="text-xs font-bold tracking-[0.25em] text-electricBlue uppercase flex items-center gap-1.5">
-            <ShieldCheck className="w-4 h-4 text-electricBlue" /> Master Owner Console (Snehith Reddy)
+            <ShieldCheck className="w-4 h-4 text-electricBlue" /> Master Admin Console
+            {isSuperAdmin ? (
+              <span className="px-2 py-0.5 rounded-md bg-amber-400/20 text-amber-300 text-[10px] font-mono font-bold flex items-center gap-1 border border-amber-400/30">
+                <Unlock className="w-3 h-3" /> Super Admin (Snehith)
+              </span>
+            ) : (
+              <span className="px-2 py-0.5 rounded-md bg-slate-800 text-slate-400 text-[10px] font-mono flex items-center gap-1">
+                <Lock className="w-3 h-3" /> Standard Staff
+              </span>
+            )}
           </span>
           <h1 className="text-3xl font-extrabold text-white font-outfit mt-1">
             Platform Operations & Financial Analytics
           </h1>
           <p className="text-slate-400 text-sm mt-1">
-            Manage partner gyms, trainers, master payment UPI, and 75/25 revenue splits.
+            Real-time Firestore synchronization, Razorpay settlement, and 75/25 trainer splits.
           </p>
         </div>
 
         <div className="flex flex-wrap gap-2 items-center">
-          {/* PROMINENT MASTER SAVE & SYNC BUTTON */}
+          {/* MASTER SAVE & SYNC BUTTON */}
           <button
             onClick={handleMasterSaveAndSync}
             disabled={isSyncing}
@@ -295,22 +348,117 @@ export const OwnerDashboard = () => {
         </div>
 
         <div className="glass-panel p-5 rounded-3xl border border-electricBlue/30 bg-electricBlue/5 space-y-2">
-          <span className="text-xs text-electricBlue font-bold">Owner Net Earnings (25%)</span>
+          <span className="text-xs text-electricBlue font-bold">Owner Net Share (25%)</span>
           <div className="text-3xl font-black text-white font-outfit">₹{netOwnerShare}</div>
-          <span className="text-[10px] text-slate-400 font-mono">Platform Facilitation Share</span>
+          <span className="text-[10px] text-slate-400 font-mono">Platform Facilitation</span>
         </div>
 
         <div className="glass-panel p-5 rounded-3xl border border-vibrantOrange/30 bg-vibrantOrange/5 space-y-2">
           <span className="text-xs text-vibrantOrange font-bold">Trainers Payout Share (75%)</span>
           <div className="text-3xl font-black text-white font-outfit">₹{trainerSplitShare}</div>
-          <span className="text-[10px] text-slate-400 font-mono">Distributed to Digital Wallets</span>
+          <span className="text-[10px] text-slate-400 font-mono">Trainer Wallets Credited</span>
         </div>
 
         <div className="glass-panel p-5 rounded-3xl border border-white/10 space-y-2">
-          <span className="text-xs text-slate-400 font-medium">Total Bookings Completed</span>
+          <span className="text-xs text-slate-400 font-medium">Total Passes Issued</span>
           <div className="text-3xl font-black text-white font-outfit">{bookings.length}</div>
-          <span className="text-[10px] text-electricBlue font-mono">Verified 2-Hour Passes</span>
+          <span className="text-[10px] text-electricBlue font-mono">Live Firestore Count</span>
         </div>
+      </div>
+
+      {/* VISUAL ANALYTICS & PEAK HOURS CHARTS */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        
+        {/* SVG Revenue Trend Line Chart */}
+        <div className="lg:col-span-8 glass-panel p-6 rounded-3xl border border-white/10 space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-base font-bold text-white font-outfit flex items-center gap-2">
+              <TrendingUp className="w-5 h-5 text-emerald-400" />
+              <span>Revenue Trend & Booking Momentum</span>
+            </h3>
+            <span className="text-xs font-mono text-slate-400">Live 7-Day Performance</span>
+          </div>
+
+          {/* SVG Visual Graph */}
+          <div className="h-44 w-full relative flex items-end pt-6">
+            <svg viewBox="0 0 500 120" className="w-full h-full overflow-visible">
+              <defs>
+                <linearGradient id="chartGlow" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#00f0ff" stopOpacity="0.4" />
+                  <stop offset="100%" stopColor="#00f0ff" stopOpacity="0" />
+                </linearGradient>
+              </defs>
+              {/* Area Gradient */}
+              <path
+                d="M 0 110 Q 80 80, 160 90 T 320 40 T 500 20 L 500 120 L 0 120 Z"
+                fill="url(#chartGlow)"
+              />
+              {/* Glowing Line */}
+              <path
+                d="M 0 110 Q 80 80, 160 90 T 320 40 T 500 20"
+                fill="none"
+                stroke="#00f0ff"
+                strokeWidth="4"
+                className="drop-shadow-[0_0_10px_#00f0ff]"
+              />
+              {/* Data Points */}
+              <circle cx="160" cy="90" r="5" fill="#ff5500" stroke="#fff" strokeWidth="2" />
+              <circle cx="320" cy="40" r="5" fill="#34d399" stroke="#fff" strokeWidth="2" />
+              <circle cx="500" cy="20" r="6" fill="#00f0ff" stroke="#fff" strokeWidth="2" />
+            </svg>
+          </div>
+
+          <div className="flex justify-between text-[11px] text-slate-400 font-mono border-t border-white/5 pt-2">
+            <span>Day 1 (₹0)</span>
+            <span>Day 3 (₹280)</span>
+            <span>Day 5 (₹560)</span>
+            <span className="text-electricBlue font-bold">Today (₹{grossRevenue})</span>
+          </div>
+        </div>
+
+        {/* Peak Workout Hours Distribution */}
+        <div className="lg:col-span-4 glass-panel p-6 rounded-3xl border border-white/10 space-y-4 flex flex-col justify-between">
+          <div>
+            <h3 className="text-base font-bold text-white font-outfit flex items-center gap-2">
+              <Activity className="w-5 h-5 text-vibrantOrange" />
+              <span>Peak Workout Slot Demand</span>
+            </h3>
+            <p className="text-xs text-slate-400 mt-1">Client slot preference distribution</p>
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <div className="flex justify-between text-xs font-semibold mb-1">
+                <span className="text-white">Morning Sessions (06:00 - 11:00 AM)</span>
+                <span className="text-electricBlue font-mono">{Math.round((peakStats.morning / peakStats.total) * 100)}%</span>
+              </div>
+              <div className="w-full h-2.5 bg-slate-900 rounded-full overflow-hidden border border-white/5">
+                <div 
+                  className="h-full bg-electricBlue rounded-full shadow-[0_0_10px_#00f0ff]" 
+                  style={{ width: `${Math.round((peakStats.morning / peakStats.total) * 100)}%` }} 
+                />
+              </div>
+            </div>
+
+            <div>
+              <div className="flex justify-between text-xs font-semibold mb-1">
+                <span className="text-white">Evening Sessions (04:00 - 08:00 PM)</span>
+                <span className="text-vibrantOrange font-mono">{Math.round((peakStats.evening / peakStats.total) * 100)}%</span>
+              </div>
+              <div className="w-full h-2.5 bg-slate-900 rounded-full overflow-hidden border border-white/5">
+                <div 
+                  className="h-full bg-vibrantOrange rounded-full shadow-[0_0_10px_#ff5500]" 
+                  style={{ width: `${Math.round((peakStats.evening / peakStats.total) * 100)}%` }} 
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="p-3 rounded-2xl bg-slate-900/80 border border-white/5 text-[11px] text-slate-400">
+            💡 <strong>Insight:</strong> 06-08 AM & 06-08 PM are high-traffic slots for personal trainers.
+          </div>
+        </div>
+
       </div>
 
       {/* GYMS & TRAINERS MANAGEMENT TABS */}
@@ -348,7 +496,12 @@ export const OwnerDashboard = () => {
                   <div className="overflow-hidden">
                     <h4 className="text-sm font-bold text-white truncate">{g.name}</h4>
                     <p className="text-xs text-slate-400 truncate">{g.location}</p>
-                    <span className="text-[10px] text-electricBlue font-bold">₹{g.startingPrice || 280}/Slot</span>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-[10px] text-electricBlue font-bold font-mono">₹{g.startingPrice || 280}/Slot</span>
+                      <span className="text-[10px] text-amber-400 flex items-center gap-0.5">
+                        <Star className="w-3 h-3 fill-amber-400" /> {g.rating || 4.9}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
@@ -406,7 +559,7 @@ export const OwnerDashboard = () => {
                     <div className="overflow-hidden">
                       <h4 className="text-sm font-bold text-white truncate">{t.name}</h4>
                       <p className="text-xs text-vibrantOrange font-medium truncate">{belongingGym?.name || 'Assigned Gym'}</p>
-                      <p className="text-[10px] text-slate-400">Phone: {t.phone}</p>
+                      <p className="text-[10px] text-slate-400 font-mono">Wallet: ₹{t.walletBalance || 0}</p>
                     </div>
                   </div>
 
@@ -433,51 +586,42 @@ export const OwnerDashboard = () => {
 
       </div>
 
-      {/* MASTER OWNER UPI CONFIGURATION */}
+      {/* MASTER RAZORPAY & UPI GATEWAY CONFIGURATION */}
       <div className="glass-panel p-6 rounded-3xl border border-white/10 space-y-4">
         <h3 className="text-lg font-bold text-white font-outfit flex items-center gap-2">
-          <QrCode className="w-5 h-5 text-electricBlue" />
-          <span>Master Owner Payment UPI Settings</span>
+          <DollarSign className="w-5 h-5 text-emerald-400" />
+          <span>Payment Gateway & Razorpay Settings</span>
         </h3>
 
         <form onSubmit={handleUpdateUPI} className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
-          <div className="md:col-span-5">
+          <div className="md:col-span-4">
+            <label className="text-xs text-slate-300 block mb-1">Razorpay Key ID</label>
+            <input
+              type="text"
+              value={upiForm.razorpayKeyId}
+              onChange={(e) => setUpiForm({ ...upiForm, razorpayKeyId: e.target.value })}
+              placeholder="e.g. rzp_test_FITUPDemoKey"
+              className="w-full bg-slate-900 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-emerald-400 font-mono"
+            />
+          </div>
+
+          <div className="md:col-span-4">
             <label className="text-xs text-slate-300 block mb-1">Master Owner UPI ID</label>
             <input
               type="text"
               value={upiForm.ownerUpiId}
               onChange={(e) => setUpiForm({ ...upiForm, ownerUpiId: e.target.value })}
               placeholder="e.g. 9030118909@ybl"
-              className="w-full bg-slate-900 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-electricBlue"
+              className="w-full bg-slate-900 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-electricBlue font-mono"
             />
           </div>
 
-          <div className="md:col-span-5">
-            <div className="flex justify-between items-center mb-1">
-              <label className="text-xs text-slate-300">Payment QR Code Image URL</label>
-              <button
-                type="button"
-                onClick={() => setUpiForm({ ...upiForm, ownerQrCodeUrl: "https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=upi://pay?pa=9030118909@ybl&pn=FITUP%20Owner&am=200&cu=INR" })}
-                className="text-[10px] text-electricBlue hover:underline"
-              >
-                [Use Preset Owner QR]
-              </button>
-            </div>
-            <input
-              type="text"
-              value={upiForm.ownerQrCodeUrl}
-              onChange={(e) => setUpiForm({ ...upiForm, ownerQrCodeUrl: e.target.value })}
-              placeholder="QR Code Image URL"
-              className="w-full bg-slate-900 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-electricBlue"
-            />
-          </div>
-
-          <div className="md:col-span-2">
+          <div className="md:col-span-4">
             <button
               type="submit"
-              className="w-full py-2.5 bg-electricBlue text-slate-950 font-bold rounded-xl text-xs hover:shadow-[0_0_15px_#00f0ff] transition-all"
+              className="w-full py-2.5 bg-emerald-500 text-slate-950 font-bold rounded-xl text-xs hover:shadow-[0_0_15px_#34d399] transition-all"
             >
-              Save UPI
+              Save Gateway Configuration
             </button>
           </div>
         </form>
@@ -537,7 +681,7 @@ export const OwnerDashboard = () => {
         )}
       </div>
 
-      {/* GYM MODAL */}
+      {/* GYM MODAL WITH SUPER ADMIN PRICE LOCK */}
       {showGymModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
           <div className="glass-panel max-w-lg w-full rounded-3xl border border-electricBlue/40 p-6 space-y-4 shadow-2xl relative max-h-[90vh] overflow-y-auto">
@@ -595,7 +739,6 @@ export const OwnerDashboard = () => {
                   ))}
                 </div>
 
-                {/* Live Image Preview */}
                 <div className="h-32 w-full rounded-2xl overflow-hidden bg-slate-950 border border-white/10">
                   <SafeImage
                     src={gymForm.image}
@@ -606,14 +749,44 @@ export const OwnerDashboard = () => {
                 </div>
               </div>
 
+              {/* TRIAL SLOT FEE (WITH SUPER ADMIN LOCK) */}
               <div>
-                <label className="text-slate-300 font-bold block mb-1">2-Hour Trial Slot Fee (₹)</label>
-                <input
-                  type="number"
-                  value={gymForm.startingPrice}
-                  onChange={(e) => setGymForm({ ...gymForm, startingPrice: Number(e.target.value) })}
-                  className="w-full bg-slate-900 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-electricBlue"
-                />
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-slate-300 font-bold">2-Hour Trial Slot Fee (₹)</label>
+                  {isSuperAdmin ? (
+                    <span className="text-[10px] text-emerald-400 font-mono font-bold flex items-center gap-1">
+                      <Unlock className="w-3 h-3" /> Unlocked (Super Admin)
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-amber-400 font-mono font-bold flex items-center gap-1 bg-amber-400/10 px-2 py-0.5 rounded-md border border-amber-400/20">
+                      <Lock className="w-3 h-3" /> Locked by Super Admin Snehith
+                    </span>
+                  )}
+                </div>
+
+                <div className="relative">
+                  <input
+                    type="number"
+                    disabled={!isSuperAdmin}
+                    value={gymForm.startingPrice}
+                    onChange={(e) => setGymForm({ ...gymForm, startingPrice: Number(e.target.value) })}
+                    className={`w-full border rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none font-mono ${
+                      isSuperAdmin 
+                        ? 'bg-slate-900 border-electricBlue focus:border-electricBlue' 
+                        : 'bg-slate-950 border-white/5 cursor-not-allowed opacity-70'
+                    }`}
+                  />
+                  {!isSuperAdmin && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500">
+                      <Lock className="w-4 h-4" />
+                    </div>
+                  )}
+                </div>
+                {!isSuperAdmin && (
+                  <p className="text-[10px] text-slate-500 mt-1">
+                    Only Master Admin Snehith (9030118909) has authority to adjust official session rates.
+                  </p>
+                )}
               </div>
 
               <div className="flex justify-end gap-2 pt-2">
