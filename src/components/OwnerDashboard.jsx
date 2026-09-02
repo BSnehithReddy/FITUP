@@ -7,7 +7,7 @@ import {
   Building2, Users, Wallet, Plus, Trash2, Edit, CheckCircle2, 
   Clock, ArrowUpRight, ShieldCheck, Sparkles, Image as ImageIcon, 
   QrCode, RefreshCw, Lock, Unlock, TrendingUp, BarChart3, 
-  DollarSign, Activity, AlertTriangle, ShieldAlert
+  DollarSign, Activity, AlertTriangle, ShieldAlert, Star
 } from 'lucide-react';
 
 const PRESET_GYM_IMAGES = [
@@ -39,11 +39,16 @@ export const OwnerDashboard = () => {
   // Super Admin Check (Phone: 9030118909)
   const isSuperAdmin = currentUser?.phone === "9030118909" && currentUser?.role === "owner";
 
-  const [gyms, setGyms] = useState(() => firestoreService.getGymsSync() || []);
-  const [trainers, setTrainers] = useState(() => firestoreService.getTrainersSync() || []);
-  const [bookings, setBookings] = useState(() => firestoreService.getBookingsSync() || []);
-  const [payoutRequests, setPayoutRequests] = useState(() => firestoreService.getPayoutRequestsSync() || []);
-  const [ownerConfig, setOwnerConfig] = useState(() => firestoreService.getOwnerConfigSync() || { ownerUpiId: '9030118909@ybl', ownerQrCodeUrl: '', razorpayKeyId: 'rzp_test_FITUPDemoKey' });
+  const [isLoading, setIsLoading] = useState(true);
+  const [gyms, setGyms] = useState([]);
+  const [trainers, setTrainers] = useState([]);
+  const [bookings, setBookings] = useState([]);
+  const [payoutRequests, setPayoutRequests] = useState([]);
+  const [ownerConfig, setOwnerConfig] = useState({ 
+    ownerUpiId: '9030118909@ybl', 
+    ownerQrCodeUrl: '', 
+    razorpayKeyId: 'rzp_test_FITUPDemoKey' 
+  });
   const [isSyncing, setIsSyncing] = useState(false);
 
   // Modals State
@@ -62,16 +67,44 @@ export const OwnerDashboard = () => {
   });
 
   const [upiForm, setUpiForm] = useState({
-    ownerUpiId: ownerConfig?.ownerUpiId || '9030118909@ybl',
-    ownerQrCodeUrl: ownerConfig?.ownerQrCodeUrl || '',
-    razorpayKeyId: ownerConfig?.razorpayKeyId || 'rzp_test_FITUPDemoKey'
+    ownerUpiId: '9030118909@ybl',
+    ownerQrCodeUrl: '',
+    razorpayKeyId: 'rzp_test_FITUPDemoKey'
   });
 
   const [toastMessage, setToastMessage] = useState(null);
 
-  // Safe Real-Time Subscriptions
+  // Initialize Data & Setup Subscriptions
   useEffect(() => {
     let isMounted = true;
+
+    try {
+      const g = firestoreService.getGymsSync();
+      if (Array.isArray(g)) setGyms(g);
+
+      const t = firestoreService.getTrainersSync();
+      if (Array.isArray(t)) setTrainers(t);
+
+      const b = firestoreService.getBookingsSync();
+      if (Array.isArray(b)) setBookings(b);
+
+      const p = firestoreService.getPayoutRequestsSync();
+      if (Array.isArray(p)) setPayoutRequests(p);
+
+      const c = firestoreService.getOwnerConfigSync();
+      if (c) {
+        setOwnerConfig(c);
+        setUpiForm({
+          ownerUpiId: c.ownerUpiId || '9030118909@ybl',
+          ownerQrCodeUrl: c.ownerQrCodeUrl || '',
+          razorpayKeyId: c.razorpayKeyId || 'rzp_test_FITUPDemoKey'
+        });
+      }
+    } catch (e) {
+      console.warn("Initial load catch:", e);
+    } finally {
+      if (isMounted) setIsLoading(false);
+    }
 
     const unsubGyms = firestoreService.subscribeGyms((data) => {
       if (isMounted && Array.isArray(data)) setGyms(data);
@@ -99,15 +132,21 @@ export const OwnerDashboard = () => {
     const handleSync = () => {
       if (!isMounted) return;
       try {
-        setGyms(firestoreService.getGymsSync() || []);
-        setTrainers(firestoreService.getTrainersSync() || []);
-        setBookings(firestoreService.getBookingsSync() || []);
-        setPayoutRequests(firestoreService.getPayoutRequestsSync() || []);
-        const cfg = firestoreService.getOwnerConfigSync();
-        if (cfg) setOwnerConfig(cfg);
-      } catch (e) {
-        console.warn("Owner sync caught error:", e);
-      }
+        const freshGyms = firestoreService.getGymsSync();
+        if (Array.isArray(freshGyms)) setGyms(freshGyms);
+
+        const freshTrainers = firestoreService.getTrainersSync();
+        if (Array.isArray(freshTrainers)) setTrainers(freshTrainers);
+
+        const freshBookings = firestoreService.getBookingsSync();
+        if (Array.isArray(freshBookings)) setBookings(freshBookings);
+
+        const freshPayouts = firestoreService.getPayoutRequestsSync();
+        if (Array.isArray(freshPayouts)) setPayoutRequests(freshPayouts);
+
+        const freshConfig = firestoreService.getOwnerConfigSync();
+        if (freshConfig) setOwnerConfig(freshConfig);
+      } catch (e) {}
     };
 
     window.addEventListener('fitup_data_sync', handleSync);
@@ -145,12 +184,12 @@ export const OwnerDashboard = () => {
     if (gym) {
       setEditingGym(gym);
       setGymForm({
-        name: gym.name || '',
-        location: gym.location || '',
-        address: gym.address || '',
-        image: gym.image || PRESET_GYM_IMAGES[0].url,
-        startingPrice: gym.startingPrice || 280,
-        amenities: gym.amenities || ['AC', 'Free Locker']
+        name: gym?.name || '',
+        location: gym?.location || '',
+        address: gym?.address || '',
+        image: gym?.image || PRESET_GYM_IMAGES[0].url,
+        startingPrice: gym?.startingPrice || 280,
+        amenities: gym?.amenities || ['AC', 'Free Locker']
       });
     } else {
       setEditingGym(null);
@@ -169,7 +208,6 @@ export const OwnerDashboard = () => {
       return;
     }
 
-    // Enforce pricing lock check
     if (editingGym && gymForm.startingPrice !== editingGym.startingPrice && !isSuperAdmin) {
       soundEffects.playError();
       alert("Security Lock: Only Super Admin Snehith (9030118909) can modify trial slot fees.");
@@ -179,8 +217,8 @@ export const OwnerDashboard = () => {
     await firestoreService.saveGym({
       ...gymForm,
       gymId: editingGym ? editingGym.gymId : null,
-      rating: editingGym ? editingGym.rating : 4.9,
-      reviewCount: editingGym ? editingGym.reviewCount : 40,
+      rating: editingGym?.rating || 4.9,
+      reviewCount: editingGym?.reviewCount || 40,
       ownerUpiId: ownerConfig?.ownerUpiId || '9030118909@ybl',
       ownerQrCodeUrl: ownerConfig?.ownerQrCodeUrl || ''
     }, currentUser);
@@ -204,15 +242,15 @@ export const OwnerDashboard = () => {
     if (trainer) {
       setEditingTrainer(trainer);
       setTrainerForm({
-        name: trainer.name || '',
-        phone: trainer.phone || '',
-        password: trainer.password || 'Trainer@123',
-        gymId: trainer.gymId || defaultGymId,
-        price: trainer.price || 280,
-        specialization: trainer.specialization || 'Strength & Conditioning',
-        experience: trainer.experience || '5+ Years',
-        image: trainer.image || PRESET_TRAINER_IMAGES[0].url,
-        availableTimings: trainer.availableTimings || ["06:00 AM - 08:00 AM", "09:00 AM - 11:00 AM"]
+        name: trainer?.name || '',
+        phone: trainer?.phone || '',
+        password: trainer?.password || 'Trainer@123',
+        gymId: trainer?.gymId || defaultGymId,
+        price: trainer?.price || 280,
+        specialization: trainer?.specialization || 'Strength & Conditioning',
+        experience: trainer?.experience || '5+ Years',
+        image: trainer?.image || PRESET_TRAINER_IMAGES[0].url,
+        availableTimings: trainer?.availableTimings || ["06:00 AM - 08:00 AM", "09:00 AM - 11:00 AM"]
       });
     } else {
       setEditingTrainer(null);
@@ -242,7 +280,7 @@ export const OwnerDashboard = () => {
     await firestoreService.saveTrainer({
       ...trainerForm,
       trainerId: editingTrainer ? editingTrainer.trainerId : null,
-      walletBalance: editingTrainer ? editingTrainer.walletBalance : 0
+      walletBalance: editingTrainer?.walletBalance || 0
     });
 
     setShowTrainerModal(false);
@@ -280,10 +318,10 @@ export const OwnerDashboard = () => {
     showToast("Payout Request Approved!");
   };
 
-  // Safe Financial Analytics Calculations
+  // Financial Analytics Calculations
   const grossRevenue = useMemo(() => {
     if (!Array.isArray(bookings)) return 0;
-    return bookings.reduce((sum, b) => b.status === 'VERIFIED' ? sum + (b.amount || 280) : sum, 0);
+    return bookings.reduce((sum, b) => b?.status === 'VERIFIED' ? sum + (Number(b?.amount) || 280) : sum, 0);
   }, [bookings]);
 
   const netOwnerShare = grossRevenue * 0.25;
@@ -298,8 +336,23 @@ export const OwnerDashboard = () => {
       if (b?.slotTime?.includes('AM')) morning++;
       else evening++;
     });
-    return { morning, evening, total: list.length || 1 };
+    const total = list.length || 1;
+    return { morning, evening, total };
   }, [bookings]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-[450px] flex items-center justify-center p-6">
+        <div className="glass-panel p-8 rounded-3xl border border-electricBlue/30 text-center space-y-4 max-w-sm w-full">
+          <div className="w-12 h-12 rounded-2xl bg-electricBlue/10 border border-electricBlue/30 text-electricBlue flex items-center justify-center mx-auto shadow-[0_0_15px_#00f0ff] animate-spin">
+            <RefreshCw className="w-6 h-6" />
+          </div>
+          <h3 className="text-lg font-bold text-white font-outfit">Loading Master Admin Console...</h3>
+          <p className="text-xs text-slate-400">Synchronizing live Firestore records & analytics</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
@@ -493,7 +546,7 @@ export const OwnerDashboard = () => {
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-bold text-white font-outfit flex items-center gap-2">
               <Building2 className="w-5 h-5 text-electricBlue" />
-              <span>Partner Gyms ({(gyms || []).length})</span>
+              <span>Partner Gyms ({gyms?.length || 0})</span>
             </h3>
 
             <button
@@ -505,25 +558,25 @@ export const OwnerDashboard = () => {
           </div>
 
           <div className="space-y-3">
-            {(gyms || []).map((g) => (
+            {gyms?.map((g) => (
               <div 
-                key={g.gymId}
+                key={g?.gymId || Math.random()}
                 className="glass-panel p-4 rounded-2xl border border-white/10 flex items-center justify-between gap-4 hover:border-electricBlue/40 transition-all"
               >
                 <div className="flex items-center space-x-3 overflow-hidden">
                   <SafeImage
-                    src={g.image}
-                    alt={g.name}
+                    src={g?.image}
+                    alt={g?.name || 'Gym'}
                     fallbackType="gym"
                     className="w-14 h-14 rounded-xl object-cover"
                   />
                   <div className="overflow-hidden">
-                    <h4 className="text-sm font-bold text-white truncate">{g.name}</h4>
-                    <p className="text-xs text-slate-400 truncate">{g.location}</p>
+                    <h4 className="text-sm font-bold text-white truncate">{g?.name || 'Partner Gym'}</h4>
+                    <p className="text-xs text-slate-400 truncate">{g?.location || 'Hyderabad'}</p>
                     <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-[10px] text-electricBlue font-bold font-mono">₹{g.startingPrice || 280}/Slot</span>
+                      <span className="text-[10px] text-electricBlue font-bold font-mono">₹{g?.startingPrice || 280}/Slot</span>
                       <span className="text-[10px] text-amber-400 flex items-center gap-0.5">
-                        <Star className="w-3 h-3 fill-amber-400" /> {g.rating || 4.9}
+                        <Star className="w-3 h-3 fill-amber-400" /> {g?.rating || 4.9}
                       </span>
                     </div>
                   </div>
@@ -538,7 +591,7 @@ export const OwnerDashboard = () => {
                   </button>
 
                   <button
-                    onClick={() => handleDeleteGym(g.gymId)}
+                    onClick={() => handleDeleteGym(g?.gymId)}
                     className="p-2 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -554,7 +607,7 @@ export const OwnerDashboard = () => {
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-bold text-white font-outfit flex items-center gap-2">
               <Users className="w-5 h-5 text-vibrantOrange" />
-              <span>Trainers ({(trainers || []).length})</span>
+              <span>Trainers ({trainers?.length || 0})</span>
             </h3>
 
             <button
@@ -566,24 +619,24 @@ export const OwnerDashboard = () => {
           </div>
 
           <div className="space-y-3">
-            {(trainers || []).map((t) => {
-              const belongingGym = (gyms || []).find(g => g.gymId === t.gymId);
+            {trainers?.map((t) => {
+              const belongingGym = gyms?.find(g => g?.gymId === t?.gymId);
               return (
                 <div 
-                  key={t.trainerId}
+                  key={t?.trainerId || Math.random()}
                   className="glass-panel p-4 rounded-2xl border border-white/10 flex items-center justify-between gap-4 hover:border-vibrantOrange/40 transition-all"
                 >
                   <div className="flex items-center space-x-3 overflow-hidden">
                     <SafeImage
-                      src={t.image}
-                      alt={t.name}
+                      src={t?.image}
+                      alt={t?.name || 'Trainer'}
                       fallbackType="trainer"
                       className="w-14 h-14 rounded-xl object-cover"
                     />
                     <div className="overflow-hidden">
-                      <h4 className="text-sm font-bold text-white truncate">{t.name}</h4>
+                      <h4 className="text-sm font-bold text-white truncate">{t?.name || 'Trainer Pro'}</h4>
                       <p className="text-xs text-vibrantOrange font-medium truncate">{belongingGym?.name || 'Assigned Gym'}</p>
-                      <p className="text-[10px] text-slate-400 font-mono">Wallet: ₹{t.walletBalance || 0}</p>
+                      <p className="text-[10px] text-slate-400 font-mono">Wallet: ₹{t?.walletBalance || 0}</p>
                     </div>
                   </div>
 
@@ -596,7 +649,7 @@ export const OwnerDashboard = () => {
                     </button>
 
                     <button
-                      onClick={() => handleDeleteTrainer(t.trainerId)}
+                      onClick={() => handleDeleteTrainer(t?.trainerId)}
                       className="p-2 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -673,22 +726,22 @@ export const OwnerDashboard = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
-                {(payoutRequests || []).map((req) => (
-                  <tr key={req.requestId} className="hover:bg-slate-900/50">
-                    <td className="p-3 font-mono font-bold text-electricBlue">{req.requestId}</td>
-                    <td className="p-3 font-bold text-white">{req.trainerName}</td>
-                    <td className="p-3 font-bold text-vibrantOrange">₹{req.amountRequested}</td>
+                {payoutRequests?.map((req) => (
+                  <tr key={req?.requestId || Math.random()} className="hover:bg-slate-900/50">
+                    <td className="p-3 font-mono font-bold text-electricBlue">{req?.requestId}</td>
+                    <td className="p-3 font-bold text-white">{req?.trainerName}</td>
+                    <td className="p-3 font-bold text-vibrantOrange">₹{req?.amountRequested}</td>
                     <td className="p-3">
                       <span className={`px-2 py-0.5 rounded-md font-bold text-[10px] ${
-                        req.status === 'APPROVED' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'
+                        req?.status === 'APPROVED' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'
                       }`}>
-                        {req.status}
+                        {req?.status}
                       </span>
                     </td>
                     <td className="p-3">
-                      {req.status === 'PENDING' ? (
+                      {req?.status === 'PENDING' ? (
                         <button
-                          onClick={() => handleApprovePayout(req.requestId)}
+                          onClick={() => handleApprovePayout(req?.requestId)}
                           className="px-3 py-1 bg-emerald-500 text-slate-950 font-bold rounded-lg text-[11px] hover:shadow-[0_0_10px_#34d399]"
                         >
                           Approve Payout
@@ -863,8 +916,8 @@ export const OwnerDashboard = () => {
                   onChange={(e) => setTrainerForm({ ...trainerForm, gymId: e.target.value })}
                   className="w-full bg-slate-900 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-vibrantOrange"
                 >
-                  {(gyms || []).map(g => (
-                    <option key={g.gymId} value={g.gymId}>{g.name} ({g.location})</option>
+                  {gyms?.map(g => (
+                    <option key={g?.gymId || Math.random()} value={g?.gymId}>{g?.name} ({g?.location})</option>
                   ))}
                 </select>
               </div>

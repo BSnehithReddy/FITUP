@@ -136,7 +136,7 @@ const INITIAL_DATA = {
     reviews: [
         {
             reviewId: "rev-1",
-            targetId: "gym-1", // gymId or trainerId
+            targetId: "gym-1",
             targetType: "gym",
             userName: "Karthik Raja",
             userPhone: "9876500112",
@@ -167,6 +167,17 @@ const STORAGE_KEYS = {
     PAYOUT_REQUESTS: "fitup_payout_requests"
 };
 
+const safeJsonParse = (key, fallback) => {
+    try {
+        const item = localStorage.getItem(key);
+        if (!item) return fallback;
+        const parsed = JSON.parse(item);
+        return parsed !== null && parsed !== undefined ? parsed : fallback;
+    } catch (e) {
+        return fallback;
+    }
+};
+
 const initLocalStore = () => {
     if (!localStorage.getItem(STORAGE_KEYS.OWNER_CONFIG)) {
         localStorage.setItem(STORAGE_KEYS.OWNER_CONFIG, JSON.stringify(INITIAL_DATA.ownerConfig));
@@ -195,20 +206,19 @@ export const firestoreService = {
     // REAL-TIME FIRESTORE SUBSCRIPTIONS (onSnapshot)
     // ----------------------------------------------------
     subscribeGyms(callback) {
-        // Immediate local callback
         callback(this.getGymsSync());
-
-        // Firestore real-time listener with error safety
         try {
             const unsub = onSnapshot(collection(db, "gyms"), (snapshot) => {
-                if (!snapshot.empty) {
+                if (snapshot && !snapshot.empty) {
                     const firestoreGyms = [];
                     snapshot.forEach(doc => firestoreGyms.push({ ...doc.data(), gymId: doc.id }));
-                    localStorage.setItem(STORAGE_KEYS.GYMS, JSON.stringify(firestoreGyms));
-                    callback(firestoreGyms);
+                    if (firestoreGyms.length > 0) {
+                        localStorage.setItem(STORAGE_KEYS.GYMS, JSON.stringify(firestoreGyms));
+                        callback(firestoreGyms);
+                    }
                 }
             }, (error) => {
-                console.info("Firestore live listener in offline fallback mode:", error?.message || error);
+                console.info("Firestore live listener in offline fallback mode");
             });
             return unsub;
         } catch (e) {
@@ -220,11 +230,13 @@ export const firestoreService = {
         callback(this.getTrainersSync());
         try {
             const unsub = onSnapshot(collection(db, "trainers"), (snapshot) => {
-                if (!snapshot.empty) {
+                if (snapshot && !snapshot.empty) {
                     const firestoreTrainers = [];
                     snapshot.forEach(doc => firestoreTrainers.push({ ...doc.data(), trainerId: doc.id }));
-                    localStorage.setItem(STORAGE_KEYS.TRAINERS, JSON.stringify(firestoreTrainers));
-                    callback(firestoreTrainers);
+                    if (firestoreTrainers.length > 0) {
+                        localStorage.setItem(STORAGE_KEYS.TRAINERS, JSON.stringify(firestoreTrainers));
+                        callback(firestoreTrainers);
+                    }
                 }
             }, () => {});
             return unsub;
@@ -237,11 +249,13 @@ export const firestoreService = {
         callback(this.getBookingsSync());
         try {
             const unsub = onSnapshot(collection(db, "bookings"), (snapshot) => {
-                if (!snapshot.empty) {
+                if (snapshot && !snapshot.empty) {
                     const firestoreBookings = [];
                     snapshot.forEach(doc => firestoreBookings.push({ ...doc.data(), bookingId: doc.id }));
-                    localStorage.setItem(STORAGE_KEYS.BOOKINGS, JSON.stringify(firestoreBookings));
-                    callback(firestoreBookings);
+                    if (firestoreBookings.length > 0) {
+                        localStorage.setItem(STORAGE_KEYS.BOOKINGS, JSON.stringify(firestoreBookings));
+                        callback(firestoreBookings);
+                    }
                 }
             }, () => {});
             return unsub;
@@ -254,11 +268,13 @@ export const firestoreService = {
         callback(this.getReviewsSync());
         try {
             const unsub = onSnapshot(collection(db, "reviews"), (snapshot) => {
-                if (!snapshot.empty) {
+                if (snapshot && !snapshot.empty) {
                     const firestoreReviews = [];
                     snapshot.forEach(doc => firestoreReviews.push({ ...doc.data(), reviewId: doc.id }));
-                    localStorage.setItem(STORAGE_KEYS.REVIEWS, JSON.stringify(firestoreReviews));
-                    callback(firestoreReviews);
+                    if (firestoreReviews.length > 0) {
+                        localStorage.setItem(STORAGE_KEYS.REVIEWS, JSON.stringify(firestoreReviews));
+                        callback(firestoreReviews);
+                    }
                 }
             }, () => {});
             return unsub;
@@ -271,10 +287,12 @@ export const firestoreService = {
         callback(this.getOwnerConfigSync());
         try {
             const unsub = onSnapshot(doc(db, "config", "owner_settings"), (docSnap) => {
-                if (docSnap.exists()) {
+                if (docSnap && docSnap.exists && docSnap.exists()) {
                     const data = docSnap.data();
-                    localStorage.setItem(STORAGE_KEYS.OWNER_CONFIG, JSON.stringify(data));
-                    callback(data);
+                    if (data) {
+                        localStorage.setItem(STORAGE_KEYS.OWNER_CONFIG, JSON.stringify(data));
+                        callback(data);
+                    }
                 }
             }, () => {});
             return unsub;
@@ -292,7 +310,7 @@ export const firestoreService = {
     // OWNER CONFIG
     // ----------------------------------------------------
     getOwnerConfigSync() {
-        return JSON.parse(localStorage.getItem(STORAGE_KEYS.OWNER_CONFIG) || JSON.stringify(INITIAL_DATA.ownerConfig));
+        return safeJsonParse(STORAGE_KEYS.OWNER_CONFIG, INITIAL_DATA.ownerConfig);
     },
 
     async getOwnerConfig() {
@@ -315,7 +333,8 @@ export const firestoreService = {
     // GYMS & SUPER ADMIN PRICE LOCK
     // ----------------------------------------------------
     getGymsSync() {
-        return JSON.parse(localStorage.getItem(STORAGE_KEYS.GYMS) || JSON.stringify(INITIAL_DATA.gyms));
+        const res = safeJsonParse(STORAGE_KEYS.GYMS, INITIAL_DATA.gyms);
+        return Array.isArray(res) ? res : INITIAL_DATA.gyms;
     },
 
     async getGyms() {
@@ -333,30 +352,25 @@ export const firestoreService = {
             savedGym.gymId = 'gym-' + Date.now();
         }
 
-        // Check if existing gym is having price modified
         const gyms = this.getGymsSync();
         const existingIdx = gyms.findIndex(g => g.gymId === savedGym.gymId);
         
-        // Super Admin Price Enforcement Check
         if (existingIdx !== -1) {
             const existing = gyms[existingIdx];
             if (savedGym.startingPrice !== existing.startingPrice) {
                 const isSuperAdmin = currentUser?.phone === "9030118909" && currentUser?.role === "owner";
                 if (!isSuperAdmin) {
-                    // Revert to original admin price if unauthorized
                     savedGym.startingPrice = existing.startingPrice;
-                    console.warn("Security Alert: Unauthorized pricing modification blocked. Super Admin credentials required.");
+                    console.warn("Security Alert: Unauthorized pricing modification blocked.");
                 }
             }
         }
         
-        // Local Optimistic Update
         if (existingIdx !== -1) gyms[existingIdx] = savedGym;
         else gyms.push(savedGym);
         localStorage.setItem(STORAGE_KEYS.GYMS, JSON.stringify(gyms));
         emitDataSync();
 
-        // Direct Firestore Write
         try {
             await setDoc(doc(db, "gyms", savedGym.gymId), savedGym);
         } catch (e) {}
@@ -400,7 +414,8 @@ export const firestoreService = {
     // TRAINERS
     // ----------------------------------------------------
     getTrainersSync() {
-        return JSON.parse(localStorage.getItem(STORAGE_KEYS.TRAINERS) || JSON.stringify(INITIAL_DATA.trainers));
+        const res = safeJsonParse(STORAGE_KEYS.TRAINERS, INITIAL_DATA.trainers);
+        return Array.isArray(res) ? res : INITIAL_DATA.trainers;
     },
 
     async getTrainers() {
@@ -439,10 +454,11 @@ export const firestoreService = {
     },
 
     // ----------------------------------------------------
-    // BOOKINGS & RAZORPAY SETTLEMENT
+    // BOOKINGS
     // ----------------------------------------------------
     getBookingsSync() {
-        return JSON.parse(localStorage.getItem(STORAGE_KEYS.BOOKINGS) || JSON.stringify(INITIAL_DATA.bookings));
+        const res = safeJsonParse(STORAGE_KEYS.BOOKINGS, INITIAL_DATA.bookings);
+        return Array.isArray(res) ? res : INITIAL_DATA.bookings;
     },
 
     async getBookings() {
@@ -467,7 +483,6 @@ export const firestoreService = {
         bookings.unshift(newBooking);
         localStorage.setItem(STORAGE_KEYS.BOOKINGS, JSON.stringify(bookings));
 
-        // Credit 75% to Trainer Digital Wallet & 25% Platform Share
         const trainers = this.getTrainersSync();
         const trainerIndex = trainers.findIndex(t => t.trainerId === newBooking.trainerId);
         if (trainerIndex !== -1) {
@@ -514,7 +529,8 @@ export const firestoreService = {
     // RATINGS & REVIEWS
     // ----------------------------------------------------
     getReviewsSync() {
-        return JSON.parse(localStorage.getItem(STORAGE_KEYS.REVIEWS) || JSON.stringify(INITIAL_DATA.reviews));
+        const res = safeJsonParse(STORAGE_KEYS.REVIEWS, INITIAL_DATA.reviews);
+        return Array.isArray(res) ? res : INITIAL_DATA.reviews;
     },
 
     async getReviews() {
@@ -533,7 +549,6 @@ export const firestoreService = {
         reviews.unshift(newReview);
         localStorage.setItem(STORAGE_KEYS.REVIEWS, JSON.stringify(reviews));
 
-        // Dynamically update average rating on target Gym
         if (reviewData.targetType === 'gym') {
             const gyms = this.getGymsSync();
             const gIdx = gyms.findIndex(g => g.gymId === reviewData.targetId);
@@ -560,7 +575,8 @@ export const firestoreService = {
     // PAYOUT REQUESTS
     // ----------------------------------------------------
     getPayoutRequestsSync() {
-        return JSON.parse(localStorage.getItem(STORAGE_KEYS.PAYOUT_REQUESTS) || "[]");
+        const res = safeJsonParse(STORAGE_KEYS.PAYOUT_REQUESTS, []);
+        return Array.isArray(res) ? res : [];
     },
 
     async getPayoutRequests() {
