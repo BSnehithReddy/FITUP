@@ -1,16 +1,17 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
 import { LogoImage } from './Logo';
-import { Dumbbell, Shield, User, LogOut, Ticket, LayoutDashboard, Search, Sparkles } from 'lucide-react';
+import { Dumbbell, Shield, User, LogOut, Ticket, LayoutDashboard, Search, Sparkles, Building2 } from 'lucide-react';
 
 export const Navbar = ({ activeTab, setActiveTab }) => {
   const { currentUser, openAuthModal, logout } = useAuth();
 
   // Strict Master Admin check (Phone: 9030118909 and role: owner)
   const isMasterAdmin = currentUser?.phone === '9030118909' && currentUser?.role === 'owner';
+  const isGymOwner = currentUser?.role === 'gym_owner';
 
   return (
-    <header className="sticky top-0 z-50 glass-panel border-b border-white/10 shadow-2xl">
+    <header className="sticky top-0 z-50 glass-panel border-b border-white/10 shadow-2xl safe-area-top">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
         
         {/* Brand Logo */}
@@ -57,6 +58,7 @@ export const Navbar = ({ activeTab, setActiveTab }) => {
             <span>My Passes</span>
           </button>
 
+          {/* Trainer Portal */}
           {currentUser?.role === 'trainer' && (
             <button
               onClick={() => setActiveTab('trainer_dash')}
@@ -72,7 +74,23 @@ export const Navbar = ({ activeTab, setActiveTab }) => {
             </button>
           )}
 
-          {/* Conditional Owner Console - ONLY VISIBLE TO MASTER ADMIN SNEHITH (9030118909) */}
+          {/* Partner Gym Owner Portal (e.g. Vinay) */}
+          {isGymOwner && (
+            <button
+              onClick={() => setActiveTab('gym_owner_dash')}
+              className={`flex items-center space-x-1.5 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all ${
+                activeTab === 'gym_owner_dash' 
+                  ? 'bg-emerald-400/10 text-emerald-400 border border-emerald-400/40 shadow-[0_0_10px_rgba(52,211,153,0.2)]' 
+                  : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
+              }`}
+            >
+              <Building2 className="w-4 h-4 text-emerald-400" />
+              <span className="hidden md:inline">Gym Dashboard</span>
+              <span className="md:hidden">Gym</span>
+            </button>
+          )}
+
+          {/* Master Admin Console - ONLY VISIBLE TO MASTER ADMIN SNEHITH (9030118909) */}
           {isMasterAdmin && (
             <button
               onClick={() => setActiveTab('owner_dash')}
@@ -83,8 +101,8 @@ export const Navbar = ({ activeTab, setActiveTab }) => {
               }`}
             >
               <Shield className="w-4 h-4 text-electricBlue" />
-              <span className="hidden md:inline">Owner Console</span>
-              <span className="md:hidden">Console</span>
+              <span className="hidden md:inline">Admin Console</span>
+              <span className="md:hidden">Admin</span>
             </button>
           )}
         </nav>
@@ -105,8 +123,8 @@ export const Navbar = ({ activeTab, setActiveTab }) => {
                   {isMasterAdmin && (
                     <span className="text-electricBlue">Master Admin</span>
                   )}
-                  {!isMasterAdmin && currentUser.role === 'owner' && (
-                    <span className="text-slate-400">Gym Partner</span>
+                  {isGymOwner && (
+                    <span className="text-emerald-400">Gym Partner</span>
                   )}
                   {currentUser.role === 'trainer' && (
                     <span className="text-vibrantOrange">Trainer Pro</span>

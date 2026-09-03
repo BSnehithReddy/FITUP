@@ -15,6 +15,24 @@
   }
 }
 
+/* Mobile Safe Area and Touch Optimization */
+.safe-area-top {
+  padding-top: max(0px, env(safe-area-inset-top));
+}
+
+.safe-area-bottom {
+  padding-bottom: max(0px, env(safe-area-inset-bottom));
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
+  touch-action: manipulation;
+  -webkit-overflow-scrolling: touch;
+}
+
 /* Glassmorphism & Neon Effects */
 .glass-panel {
   background: rgba(15, 23, 42, 0.75);

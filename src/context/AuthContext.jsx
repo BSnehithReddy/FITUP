@@ -37,27 +37,52 @@ export const AuthProvider = ({ children }) => {
   const login = async (phone, password) => {
     soundEffects.playClick();
 
-    // 1. STRICT OWNER CHECK (SNEHITH)
+    // 1. STRICT MASTER ADMIN CHECK (SNEHITH)
     if (phone === "9030118909") {
       if (password === "Snehith@020777") {
-        const ownerUser = {
+        const masterAdmin = {
           uid: "usr-owner-snehith",
           name: "SNEHITH",
           phone: "9030118909",
           role: "owner"
         };
-        setCurrentUser(ownerUser);
+        setCurrentUser(masterAdmin);
         soundEffects.playSuccessChime();
         closeAuthModal();
-        return { success: true, user: ownerUser, role: "owner" };
+        return { success: true, user: masterAdmin, role: "owner" };
       } else {
         soundEffects.playError();
         throw new Error("Incorrect password or phone number.");
       }
     }
 
-    // 2. DYNAMIC TRAINER AUTHENTICATION CHECK
-    const trainers = await firestoreService.getTrainers();
+    // 2. GYM OWNER AUTHENTICATION CHECK (e.g. Vinay / GS Fitness Studio)
+    const gyms = firestoreService.getGymsSync();
+    const matchedGym = gyms.find(g => g.ownerPhone === phone);
+
+    if (matchedGym) {
+      const expectedPassword = matchedGym.ownerPassword || "Owner@123";
+      if (password === expectedPassword) {
+        const gymOwnerUser = {
+          uid: "usr-gym-" + matchedGym.gymId,
+          name: matchedGym.ownerName || (matchedGym.name + " Owner"),
+          phone: matchedGym.ownerPhone,
+          gymId: matchedGym.gymId,
+          gymName: matchedGym.name,
+          role: "gym_owner"
+        };
+        setCurrentUser(gymOwnerUser);
+        soundEffects.playSuccessChime();
+        closeAuthModal();
+        return { success: true, user: gymOwnerUser, role: "gym_owner" };
+      } else {
+        soundEffects.playError();
+        throw new Error("Incorrect password for Gym Owner.");
+      }
+    }
+
+    // 3. TRAINER AUTHENTICATION CHECK
+    const trainers = firestoreService.getTrainersSync();
     const matchedTrainer = trainers.find(t => t.phone === phone);
 
     if (matchedTrainer) {
@@ -80,14 +105,14 @@ export const AuthProvider = ({ children }) => {
       }
     }
 
-    // 3. REGISTERED CLIENT CHECK
+    // 4. REGISTERED CLIENT CHECK
     const registeredClients = JSON.parse(localStorage.getItem(REGISTERED_CLIENTS_KEY) || "[]");
     const matchedClient = registeredClients.find(c => c.phone === phone);
 
     if (matchedClient) {
       if (matchedClient.password === password) {
         const clientUser = {
-          uid: matchedClient.uid || "usr-client-" + Date.now(),
+          uid: matchedClient.uid || ("usr-client-" + Date.now()),
           name: matchedClient.name,
           phone: matchedClient.phone,
           role: "client"
@@ -102,7 +127,7 @@ export const AuthProvider = ({ children }) => {
       }
     }
 
-    // Default Client Demo Login (Auto-registers client if valid)
+    // Default Client Demo Login (Auto-registers client if credentials provided)
     const newClient = {
       uid: "usr-client-" + Date.now(),
       name: "FITUP Member",
@@ -122,26 +147,24 @@ export const AuthProvider = ({ children }) => {
   const register = async (name, phone, password) => {
     soundEffects.playClick();
 
-    // Check if registering owner phone
     if (phone === "9030118909") {
       if (password === "Snehith@020777") {
-        const ownerUser = {
+        const masterAdmin = {
           uid: "usr-owner-snehith",
           name: name.toUpperCase() || "SNEHITH",
           phone: "9030118909",
           role: "owner"
         };
-        setCurrentUser(ownerUser);
+        setCurrentUser(masterAdmin);
         soundEffects.playSuccessChime();
         closeAuthModal();
-        return { success: true, user: ownerUser, role: "owner" };
+        return { success: true, user: masterAdmin, role: "owner" };
       } else {
         soundEffects.playError();
         throw new Error("Incorrect password or phone number.");
       }
     }
 
-    // Save Client in Registered Clients DB
     const registeredClients = JSON.parse(localStorage.getItem(REGISTERED_CLIENTS_KEY) || "[]");
     const existing = registeredClients.find(c => c.phone === phone);
 
@@ -167,6 +190,14 @@ export const AuthProvider = ({ children }) => {
     return { success: true, user: newClient, role: "client" };
   };
 
+  const deleteAccount = async () => {
+    if (!currentUser) return;
+    soundEffects.playClick();
+    await firestoreService.deleteAccountData(currentUser.phone);
+    setCurrentUser(null);
+    localStorage.removeItem("fitup_user_session");
+  };
+
   const logout = () => {
     soundEffects.playClick();
     setCurrentUser(null);
@@ -182,6 +213,7 @@ export const AuthProvider = ({ children }) => {
       setAuthMode,
       login,
       register,
+      deleteAccount,
       logout
     }}>
       {children}

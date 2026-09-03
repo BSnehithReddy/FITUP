@@ -6,6 +6,7 @@ import { AuthModal } from './components/AuthModal';
 import { ClientDashboard } from './components/ClientDashboard';
 import { TrainerDashboard } from './components/TrainerDashboard';
 import { OwnerDashboard } from './components/OwnerDashboard';
+import { GymOwnerDashboard } from './components/GymOwnerDashboard';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
 const MainContent = () => {
@@ -16,6 +17,7 @@ const MainContent = () => {
       try {
         const u = JSON.parse(saved);
         if (u?.phone === '9030118909' && u?.role === 'owner') return 'owner_dash';
+        if (u?.role === 'gym_owner') return 'gym_owner_dash';
         if (u?.role === 'trainer') return 'trainer_dash';
       } catch (e) {}
     }
@@ -27,10 +29,13 @@ const MainContent = () => {
     if (activeTab === 'owner_dash' && (currentUser?.phone !== '9030118909' || currentUser?.role !== 'owner')) {
       setActiveTab('home');
     }
-  }, [currentUser]);
+    if (activeTab === 'gym_owner_dash' && currentUser?.role !== 'gym_owner') {
+      setActiveTab('home');
+    }
+  }, [currentUser, activeTab]);
 
   return (
-    <div className="min-h-screen bg-[#070b19] text-gray-100 flex flex-col selection:bg-electricBlue/30 selection:text-electricBlue">
+    <div className="min-h-screen bg-[#070b19] text-gray-100 flex flex-col selection:bg-electricBlue/30 selection:text-electricBlue safe-area-bottom">
       
       {/* Navigation Bar */}
       <Navbar activeTab={activeTab} setActiveTab={setActiveTab} />
@@ -44,6 +49,10 @@ const MainContent = () => {
 
           {activeTab === 'trainer_dash' && (
             <TrainerDashboard />
+          )}
+
+          {activeTab === 'gym_owner_dash' && (
+            <GymOwnerDashboard />
           )}
 
           {activeTab === 'owner_dash' && (

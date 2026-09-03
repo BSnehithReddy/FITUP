@@ -39,6 +39,8 @@ export const AuthModal = ({ setActiveTab }) => {
         const res = await register(name, phone, password);
         if (res.role === 'owner') {
           setActiveTab('owner_dash');
+        } else if (res.role === 'gym_owner') {
+          setActiveTab('gym_owner_dash');
         } else if (res.role === 'trainer') {
           setActiveTab('trainer_dash');
         } else {
@@ -48,6 +50,8 @@ export const AuthModal = ({ setActiveTab }) => {
         const res = await login(phone, password);
         if (res.role === 'owner') {
           setActiveTab('owner_dash');
+        } else if (res.role === 'gym_owner') {
+          setActiveTab('gym_owner_dash');
         } else if (res.role === 'trainer') {
           setActiveTab('trainer_dash');
         } else {

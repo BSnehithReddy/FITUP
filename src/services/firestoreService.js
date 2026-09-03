@@ -21,7 +21,10 @@ const INITIAL_DATA = {
         ownerUpiId: "9030118909@ybl",
         ownerPhone: "9030118909",
         ownerQrCodeUrl: "https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=upi://pay?pa=9030118909@ybl&pn=FITUP%20Owner&am=280&cu=INR",
-        razorpayKeyId: "rzp_test_FITUPDemoKey"
+        razorpayKeyId: "rzp_test_FITUPDemoKey",
+        defaultPlatformSplit: 20,
+        defaultGymSplit: 30,
+        defaultTrainerSplit: 50
     },
     gyms: [
         {
@@ -34,6 +37,11 @@ const INITIAL_DATA = {
             reviewCount: 42,
             startingPrice: 280,
             amenities: ["AC", "Free Locker", "Steam Bath", "Protein Bar"],
+            ownerName: "Vinay",
+            ownerPhone: "9123456780",
+            ownerPassword: "Owner@123",
+            gymSplitPercent: 30,
+            walletBalance: 350,
             ownerUpiId: "9030118909@ybl",
             ownerQrCodeUrl: "https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=upi://pay?pa=9030118909@ybl&pn=FITUP%20Owner&am=280&cu=INR"
         },
@@ -47,6 +55,11 @@ const INITIAL_DATA = {
             reviewCount: 38,
             startingPrice: 250,
             amenities: ["Crossfit Zone", "Cardio Deck", "Sauna", "Certified Trainers"],
+            ownerName: "Rahul Sharma",
+            ownerPhone: "9876500001",
+            ownerPassword: "Owner@123",
+            gymSplitPercent: 30,
+            walletBalance: 240,
             ownerUpiId: "9030118909@ybl",
             ownerQrCodeUrl: "https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=upi://pay?pa=9030118909@ybl&pn=FITUP%20Owner&am=250&cu=INR"
         },
@@ -60,6 +73,11 @@ const INITIAL_DATA = {
             reviewCount: 56,
             startingPrice: 250,
             amenities: ["Heavy Powerlifting", "Physio Zone", "Valet Parking", "Juice Bar"],
+            ownerName: "Karan Singh",
+            ownerPhone: "9876500002",
+            ownerPassword: "Owner@123",
+            gymSplitPercent: 30,
+            walletBalance: 420,
             ownerUpiId: "9030118909@ybl",
             ownerQrCodeUrl: "https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=upi://pay?pa=9030118909@ybl&pn=FITUP%20Owner&am=250&cu=INR"
         }
@@ -73,6 +91,7 @@ const INITIAL_DATA = {
             password: "Trainer@123",
             upiId: "vikram@upi",
             walletBalance: 450,
+            trainerSplitPercent: 50,
             specialization: "Hypertrophy & Strength",
             experience: "7+ Years • Certified CSCS",
             rating: 4.9,
@@ -88,6 +107,7 @@ const INITIAL_DATA = {
             password: "Trainer@123",
             upiId: "rahul@upi",
             walletBalance: 300,
+            trainerSplitPercent: 50,
             specialization: "Fat Loss & HIIT Transformation",
             experience: "4+ Years • K11 Certified",
             rating: 4.8,
@@ -103,6 +123,7 @@ const INITIAL_DATA = {
             password: "Trainer@123",
             upiId: "ananya@upi",
             walletBalance: 600,
+            trainerSplitPercent: 50,
             specialization: "Functional Mobility & Core",
             experience: "5+ Years • ACE Specialist",
             rating: 5.0,
@@ -120,11 +141,19 @@ const INITIAL_DATA = {
             gymId: "gym-1",
             gymName: "GS fitness studio",
             gymLocation: "chengicherla , Hyderabad",
+            gymOwnerName: "Vinay",
+            gymOwnerPhone: "9123456780",
             trainerId: "tr-1",
             trainerName: "Vikram Sharma",
             slotTime: "09:00 AM - 11:00 AM",
             date: "2026-09-02",
             amount: 280,
+            trainerShare: 140,
+            gymShare: 84,
+            platformShare: 56,
+            trainerPercent: 50,
+            gymPercent: 30,
+            platformPercent: 20,
             status: "VERIFIED",
             paymentMethod: "RAZORPAY",
             paymentId: "pay_Nzv890FITUP111",
@@ -164,7 +193,8 @@ const STORAGE_KEYS = {
     TRAINERS: "fitup_trainers",
     BOOKINGS: "fitup_bookings",
     REVIEWS: "fitup_reviews",
-    PAYOUT_REQUESTS: "fitup_payout_requests"
+    PAYOUT_REQUESTS: "fitup_payout_requests",
+    REGISTERED_CLIENTS: "fitup_registered_clients"
 };
 
 const safeJsonParse = (key, fallback) => {
@@ -217,9 +247,7 @@ export const firestoreService = {
                         callback(firestoreGyms);
                     }
                 }
-            }, (error) => {
-                console.info("Firestore live listener in offline fallback mode");
-            });
+            }, () => {});
             return unsub;
         } catch (e) {
             return () => {};
@@ -301,6 +329,25 @@ export const firestoreService = {
         }
     },
 
+    subscribePayoutRequests(callback) {
+        callback(this.getPayoutRequestsSync());
+        try {
+            const unsub = onSnapshot(collection(db, "payoutRequests"), (snapshot) => {
+                if (snapshot && !snapshot.empty) {
+                    const firestoreRequests = [];
+                    snapshot.forEach(doc => firestoreRequests.push({ ...doc.data(), requestId: doc.id }));
+                    if (firestoreRequests.length > 0) {
+                        localStorage.setItem(STORAGE_KEYS.PAYOUT_REQUESTS, JSON.stringify(firestoreRequests));
+                        callback(firestoreRequests);
+                    }
+                }
+            }, () => {});
+            return unsub;
+        } catch (e) {
+            return () => {};
+        }
+    },
+
     forceMasterSync() {
         emitDataSync();
         return true;
@@ -330,7 +377,7 @@ export const firestoreService = {
     },
 
     // ----------------------------------------------------
-    // GYMS & SUPER ADMIN PRICE LOCK
+    // GYMS & PER-GYM CONFIGURATION (30% SPLIT / WALLET)
     // ----------------------------------------------------
     getGymsSync() {
         const res = safeJsonParse(STORAGE_KEYS.GYMS, INITIAL_DATA.gyms);
@@ -350,6 +397,9 @@ export const firestoreService = {
         let savedGym = { ...gymData };
         if (!savedGym.gymId) {
             savedGym.gymId = 'gym-' + Date.now();
+            if (savedGym.gymSplitPercent === undefined) savedGym.gymSplitPercent = 30;
+            if (savedGym.walletBalance === undefined) savedGym.walletBalance = 0;
+            if (savedGym.ownerPassword === undefined) savedGym.ownerPassword = "Owner@123";
         }
 
         const gyms = this.getGymsSync();
@@ -357,6 +407,10 @@ export const firestoreService = {
         
         if (existingIdx !== -1) {
             const existing = gyms[existingIdx];
+            // Preserve wallet balance if not explicitly provided
+            if (savedGym.walletBalance === undefined) {
+                savedGym.walletBalance = existing.walletBalance || 0;
+            }
             if (savedGym.startingPrice !== existing.startingPrice) {
                 const isSuperAdmin = currentUser?.phone === "9030118909" && currentUser?.role === "owner";
                 if (!isSuperAdmin) {
@@ -411,7 +465,7 @@ export const firestoreService = {
     },
 
     // ----------------------------------------------------
-    // TRAINERS
+    // TRAINERS & PER-TRAINER CONFIGURATION (50% SPLIT / WALLET)
     // ----------------------------------------------------
     getTrainersSync() {
         const res = safeJsonParse(STORAGE_KEYS.TRAINERS, INITIAL_DATA.trainers);
@@ -428,12 +482,19 @@ export const firestoreService = {
             savedTrainer.trainerId = 'tr-' + Date.now();
             if (savedTrainer.walletBalance === undefined) savedTrainer.walletBalance = 0;
             if (savedTrainer.rating === undefined) savedTrainer.rating = 5.0;
+            if (savedTrainer.trainerSplitPercent === undefined) savedTrainer.trainerSplitPercent = 50;
         }
 
         const trainers = this.getTrainersSync();
         const idx = trainers.findIndex(t => t.trainerId === savedTrainer.trainerId);
-        if (idx !== -1) trainers[idx] = savedTrainer;
-        else trainers.push(savedTrainer);
+        if (idx !== -1) {
+            if (savedTrainer.walletBalance === undefined) {
+                savedTrainer.walletBalance = trainers[idx].walletBalance || 0;
+            }
+            trainers[idx] = savedTrainer;
+        } else {
+            trainers.push(savedTrainer);
+        }
         localStorage.setItem(STORAGE_KEYS.TRAINERS, JSON.stringify(trainers));
         emitDataSync();
 
@@ -454,7 +515,7 @@ export const firestoreService = {
     },
 
     // ----------------------------------------------------
-    // BOOKINGS
+    // 20 / 30 / 50 REVENUE DISTRIBUTION ENGINE
     // ----------------------------------------------------
     getBookingsSync() {
         const res = safeJsonParse(STORAGE_KEYS.BOOKINGS, INITIAL_DATA.bookings);
@@ -468,11 +529,39 @@ export const firestoreService = {
     async createBooking(bookingData) {
         const bookingId = 'FT-' + Math.floor(100000 + Math.random() * 900000);
         const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=PASS-${bookingId}-${encodeURIComponent(bookingData.gymName || 'FITUP')}`;
-        
+        const totalAmount = Number(bookingData.amount) || 280;
+
+        // Retrieve Gym and Trainer configuration for split calculations
+        const gyms = this.getGymsSync();
+        const gymIndex = gyms.findIndex(g => g.gymId === bookingData.gymId);
+        const gym = gymIndex !== -1 ? gyms[gymIndex] : null;
+
+        const trainers = this.getTrainersSync();
+        const trainerIndex = trainers.findIndex(t => t.trainerId === bookingData.trainerId);
+        const trainer = trainerIndex !== -1 ? trainers[trainerIndex] : null;
+
+        // Determine percentage splits (Defaults: Gym 30%, Trainer 50%, Platform 20%)
+        const gymPercent = (gym && typeof gym.gymSplitPercent === 'number') ? gym.gymSplitPercent : 30;
+        const trainerPercent = (trainer && typeof trainer.trainerSplitPercent === 'number') ? trainer.trainerSplitPercent : 50;
+        const platformPercent = Math.max(0, 100 - gymPercent - trainerPercent);
+
+        const trainerShare = Math.round((totalAmount * trainerPercent) / 100);
+        const gymShare = Math.round((totalAmount * gymPercent) / 100);
+        const platformShare = totalAmount - trainerShare - gymShare;
+
         let newBooking = {
             ...bookingData,
             bookingId,
             qrCodeUrl,
+            amount: totalAmount,
+            trainerShare,
+            gymShare,
+            platformShare,
+            trainerPercent,
+            gymPercent,
+            platformPercent,
+            gymOwnerName: gym?.ownerName || "Gym Partner",
+            gymOwnerPhone: gym?.ownerPhone || "",
             createdAt: new Date().toISOString(),
             status: "VERIFIED",
             paymentMethod: bookingData.paymentMethod || "RAZORPAY",
@@ -483,16 +572,28 @@ export const firestoreService = {
         bookings.unshift(newBooking);
         localStorage.setItem(STORAGE_KEYS.BOOKINGS, JSON.stringify(bookings));
 
-        const trainers = this.getTrainersSync();
-        const trainerIndex = trainers.findIndex(t => t.trainerId === newBooking.trainerId);
+        // Credit 50% (or custom) to Trainer Digital Wallet
         if (trainerIndex !== -1) {
-            const sessionEarnings = (newBooking.amount || 280) * 0.75;
-            trainers[trainerIndex].walletBalance = (trainers[trainerIndex].walletBalance || 0) + sessionEarnings;
+            trainers[trainerIndex].walletBalance = (trainers[trainerIndex].walletBalance || 0) + trainerShare;
             localStorage.setItem(STORAGE_KEYS.TRAINERS, JSON.stringify(trainers));
             try {
-                await updateDoc(doc(db, "trainers", trainers[trainerIndex].trainerId), { walletBalance: trainers[trainerIndex].walletBalance });
+                await updateDoc(doc(db, "trainers", trainers[trainerIndex].trainerId), { 
+                    walletBalance: trainers[trainerIndex].walletBalance 
+                });
             } catch (e) {}
         }
+
+        // Credit 30% (or custom) to Gym Owner Digital Wallet
+        if (gymIndex !== -1) {
+            gyms[gymIndex].walletBalance = (gyms[gymIndex].walletBalance || 0) + gymShare;
+            localStorage.setItem(STORAGE_KEYS.GYMS, JSON.stringify(gyms));
+            try {
+                await updateDoc(doc(db, "gyms", gyms[gymIndex].gymId), { 
+                    walletBalance: gyms[gymIndex].walletBalance 
+                });
+            } catch (e) {}
+        }
+
         emitDataSync();
 
         try {
@@ -572,7 +673,7 @@ export const firestoreService = {
     },
 
     // ----------------------------------------------------
-    // PAYOUT REQUESTS
+    // PAYOUT REQUESTS & WITHDRAWALS (TRAINER & GYM OWNER)
     // ----------------------------------------------------
     getPayoutRequestsSync() {
         const res = safeJsonParse(STORAGE_KEYS.PAYOUT_REQUESTS, []);
@@ -583,7 +684,8 @@ export const firestoreService = {
         return this.getPayoutRequestsSync();
     },
 
-    async requestPayout(trainerId, trainerName, amountRequested) {
+    // Trainer 12-Hour Withdrawal
+    async requestTrainerPayout(trainerId, trainerName, amountRequested, upiId = "") {
         const trainers = this.getTrainersSync();
         const trainerIndex = trainers.findIndex(t => t.trainerId === trainerId);
         
@@ -599,13 +701,17 @@ export const firestoreService = {
         const availableAt = new Date(now.getTime() + 12 * 3600 * 1000).toISOString();
 
         const newRequest = {
-            requestId: 'PO-' + Math.floor(1000 + Math.random() * 9000),
+            requestId: 'TPO-' + Math.floor(1000 + Math.random() * 9000),
+            type: "TRAINER",
             trainerId,
+            beneficiaryName: trainerName,
             trainerName,
-            amountRequested,
+            amountRequested: Number(amountRequested),
+            upiId: upiId || trainers[trainerIndex].upiId || "trainer@upi",
             status: "PENDING",
             requestedAt: now.toISOString(),
-            availableAt
+            availableAt,
+            estimatedSettlement: "Processing in 12 Hours"
         };
 
         const requests = this.getPayoutRequestsSync();
@@ -615,6 +721,48 @@ export const firestoreService = {
 
         try {
             await setDoc(doc(db, "payoutRequests", newRequest.requestId), newRequest);
+            await updateDoc(doc(db, "trainers", trainerId), { walletBalance: trainers[trainerIndex].walletBalance });
+        } catch (e) {}
+        return newRequest;
+    },
+
+    // Gym Owner 24-48 Hour Withdrawal (e.g. Vinay)
+    async requestGymOwnerPayout(gymId, gymName, ownerName, ownerPhone, amountRequested, upiId) {
+        const gyms = this.getGymsSync();
+        const gymIndex = gyms.findIndex(g => g.gymId === gymId);
+
+        if (gymIndex === -1) throw new Error("Gym not found");
+        if ((gyms[gymIndex].walletBalance || 0) < amountRequested) {
+            throw new Error("Insufficient accumulated 30% wallet balance for withdrawal");
+        }
+
+        gyms[gymIndex].walletBalance -= amountRequested;
+        localStorage.setItem(STORAGE_KEYS.GYMS, JSON.stringify(gyms));
+
+        const now = new Date();
+        const newRequest = {
+            requestId: 'GPO-' + Math.floor(1000 + Math.random() * 9000),
+            type: "GYM_OWNER",
+            gymId,
+            gymName,
+            beneficiaryName: ownerName || "Gym Owner",
+            ownerName: ownerName || "Gym Owner",
+            ownerPhone: ownerPhone || "",
+            amountRequested: Number(amountRequested),
+            upiId: upiId || "owner@upi",
+            status: "PENDING",
+            requestedAt: now.toISOString(),
+            estimatedSettlement: "Pending Payout - Processing in 24-48 hours"
+        };
+
+        const requests = this.getPayoutRequestsSync();
+        requests.unshift(newRequest);
+        localStorage.setItem(STORAGE_KEYS.PAYOUT_REQUESTS, JSON.stringify(requests));
+        emitDataSync();
+
+        try {
+            await setDoc(doc(db, "payoutRequests", newRequest.requestId), newRequest);
+            await updateDoc(doc(db, "gyms", gymId), { walletBalance: gyms[gymIndex].walletBalance });
         } catch (e) {}
         return newRequest;
     },
@@ -624,12 +772,39 @@ export const firestoreService = {
         const reqIdx = requests.findIndex(r => r.requestId === requestId);
         if (reqIdx !== -1) {
             requests[reqIdx].status = "APPROVED";
+            requests[reqIdx].approvedAt = new Date().toISOString();
             localStorage.setItem(STORAGE_KEYS.PAYOUT_REQUESTS, JSON.stringify(requests));
             emitDataSync();
             try {
-                await updateDoc(doc(db, "payoutRequests", requestId), { status: "APPROVED" });
+                await updateDoc(doc(db, "payoutRequests", requestId), { 
+                    status: "APPROVED",
+                    approvedAt: requests[reqIdx].approvedAt
+                });
             } catch (e) {}
         }
         return requests[reqIdx];
+    },
+
+    // ----------------------------------------------------
+    // ACCOUNT DELETION (Google Play Policy Compliance)
+    // ----------------------------------------------------
+    async deleteAccountData(phone) {
+        // 1. Remove from registered clients
+        let clients = safeJsonParse(STORAGE_KEYS.REGISTERED_CLIENTS, []);
+        clients = clients.filter(c => c.phone !== phone);
+        localStorage.setItem(STORAGE_KEYS.REGISTERED_CLIENTS, JSON.stringify(clients));
+
+        // 2. Anonymize past booking names
+        let bookings = this.getBookingsSync();
+        bookings = bookings.map(b => {
+            if (b.userPhone === phone) {
+                return { ...b, userName: "Deleted User", userPhone: "DELETED" };
+            }
+            return b;
+        });
+        localStorage.setItem(STORAGE_KEYS.BOOKINGS, JSON.stringify(bookings));
+
+        emitDataSync();
+        return { success: true };
     }
 };

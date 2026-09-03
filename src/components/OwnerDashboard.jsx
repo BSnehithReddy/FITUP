@@ -3,12 +3,13 @@ import { firestoreService } from '../services/firestoreService';
 import { soundEffects } from '../services/soundEffects';
 import { SafeImage } from './SafeImage';
 import { useAuth } from '../context/AuthContext';
+import { DeleteAccountModal } from './DeleteAccountModal';
 import { 
   Building2, Users, Wallet, Plus, Trash2, Edit, CheckCircle2, 
   Clock, ArrowUpRight, ShieldCheck, Sparkles, Image as ImageIcon, 
   QrCode, RefreshCw, Lock, Unlock, TrendingUp, BarChart3, 
   DollarSign, Activity, AlertTriangle, ShieldAlert, Star,
-  ShieldX, ArrowLeft
+  ShieldX, ArrowLeft, Percent
 } from 'lucide-react';
 
 const PRESET_GYM_IMAGES = [
@@ -40,7 +41,7 @@ export const OwnerDashboard = ({ setActiveTab }) => {
   // Strict Master Admin Check (Phone: 9030118909 & role: owner)
   const isMasterAdmin = currentUser?.phone === "9030118909" && currentUser?.role === "owner";
 
-  // ROUTE GUARD PROTECTION: If not Master Admin, block rendering and show Access Denied
+  // ROUTE GUARD PROTECTION
   if (!isMasterAdmin) {
     return (
       <div className="min-h-[500px] flex items-center justify-center p-6">
@@ -77,23 +78,45 @@ export const OwnerDashboard = ({ setActiveTab }) => {
   const [ownerConfig, setOwnerConfig] = useState({ 
     ownerUpiId: '9030118909@ybl', 
     ownerQrCodeUrl: '', 
-    razorpayKeyId: 'rzp_test_FITUPDemoKey' 
+    razorpayKeyId: 'rzp_test_FITUPDemoKey',
+    defaultPlatformSplit: 20,
+    defaultGymSplit: 30,
+    defaultTrainerSplit: 50
   });
   const [isSyncing, setIsSyncing] = useState(false);
 
   // Modals State
   const [showGymModal, setShowGymModal] = useState(false);
   const [showTrainerModal, setShowTrainerModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [editingGym, setEditingGym] = useState(null);
   const [editingTrainer, setEditingTrainer] = useState(null);
 
   // Form State
   const [gymForm, setGymForm] = useState({
-    name: '', location: '', address: '', image: PRESET_GYM_IMAGES[0].url, startingPrice: 280, amenities: ['AC', 'Free Locker']
+    name: '', 
+    location: '', 
+    address: '', 
+    image: PRESET_GYM_IMAGES[0].url, 
+    startingPrice: 280, 
+    amenities: ['AC', 'Free Locker'],
+    ownerName: 'Vinay',
+    ownerPhone: '9123456780',
+    ownerPassword: 'Owner@123',
+    gymSplitPercent: 30
   });
 
   const [trainerForm, setTrainerForm] = useState({
-    name: '', phone: '', password: 'Trainer@123', gymId: '', price: 280, specialization: 'Hypertrophy & Strength', experience: '5+ Years', image: PRESET_TRAINER_IMAGES[0].url, availableTimings: ["06:00 AM - 08:00 AM", "09:00 AM - 11:00 AM", "04:00 PM - 06:00 PM"]
+    name: '', 
+    phone: '', 
+    password: 'Trainer@123', 
+    gymId: '', 
+    price: 280, 
+    trainerSplitPercent: 50,
+    specialization: 'Hypertrophy & Strength', 
+    experience: '5+ Years', 
+    image: PRESET_TRAINER_IMAGES[0].url, 
+    availableTimings: ["06:00 AM - 08:00 AM", "09:00 AM - 11:00 AM", "04:00 PM - 06:00 PM"]
   });
 
   const [upiForm, setUpiForm] = useState({
@@ -159,21 +182,17 @@ export const OwnerDashboard = ({ setActiveTab }) => {
       }
     });
 
+    const unsubPayouts = firestoreService.subscribePayoutRequests ? firestoreService.subscribePayoutRequests((data) => {
+      if (isMounted && Array.isArray(data)) setPayoutRequests(data);
+    }) : () => {};
+
     const handleSync = () => {
       if (!isMounted) return;
       try {
-        const freshGyms = firestoreService.getGymsSync();
-        if (Array.isArray(freshGyms)) setGyms(freshGyms);
-
-        const freshTrainers = firestoreService.getTrainersSync();
-        if (Array.isArray(freshTrainers)) setTrainers(freshTrainers);
-
-        const freshBookings = firestoreService.getBookingsSync();
-        if (Array.isArray(freshBookings)) setBookings(freshBookings);
-
-        const freshPayouts = firestoreService.getPayoutRequestsSync();
-        if (Array.isArray(freshPayouts)) setPayoutRequests(freshPayouts);
-
+        setGyms(firestoreService.getGymsSync() || []);
+        setTrainers(firestoreService.getTrainersSync() || []);
+        setBookings(firestoreService.getBookingsSync() || []);
+        setPayoutRequests(firestoreService.getPayoutRequestsSync() || []);
         const freshConfig = firestoreService.getOwnerConfigSync();
         if (freshConfig) setOwnerConfig(freshConfig);
       } catch (e) {}
@@ -186,6 +205,7 @@ export const OwnerDashboard = ({ setActiveTab }) => {
       if (typeof unsubTrainers === 'function') unsubTrainers();
       if (typeof unsubBookings === 'function') unsubBookings();
       if (typeof unsubConfig === 'function') unsubConfig();
+      if (typeof unsubPayouts === 'function') unsubPayouts();
       window.removeEventListener('fitup_data_sync', handleSync);
     };
   }, []);
@@ -219,12 +239,25 @@ export const OwnerDashboard = ({ setActiveTab }) => {
         address: gym?.address || '',
         image: gym?.image || PRESET_GYM_IMAGES[0].url,
         startingPrice: gym?.startingPrice || 280,
-        amenities: gym?.amenities || ['AC', 'Free Locker']
+        amenities: gym?.amenities || ['AC', 'Free Locker'],
+        ownerName: gym?.ownerName || 'Vinay',
+        ownerPhone: gym?.ownerPhone || '9123456780',
+        ownerPassword: gym?.ownerPassword || 'Owner@123',
+        gymSplitPercent: gym?.gymSplitPercent !== undefined ? gym.gymSplitPercent : 30
       });
     } else {
       setEditingGym(null);
       setGymForm({
-        name: '', location: '', address: '', image: PRESET_GYM_IMAGES[0].url, startingPrice: 280, amenities: ['AC', 'Free Locker', 'Steam Bath']
+        name: '', 
+        location: '', 
+        address: '', 
+        image: PRESET_GYM_IMAGES[0].url, 
+        startingPrice: 280, 
+        amenities: ['AC', 'Free Locker', 'Steam Bath'],
+        ownerName: '',
+        ownerPhone: '',
+        ownerPassword: 'Owner@123',
+        gymSplitPercent: 30
       });
     }
     setShowGymModal(true);
@@ -243,12 +276,13 @@ export const OwnerDashboard = ({ setActiveTab }) => {
       gymId: editingGym ? editingGym.gymId : null,
       rating: editingGym?.rating || 4.9,
       reviewCount: editingGym?.reviewCount || 40,
+      gymSplitPercent: Number(gymForm.gymSplitPercent) || 30,
       ownerUpiId: ownerConfig?.ownerUpiId || '9030118909@ybl',
       ownerQrCodeUrl: ownerConfig?.ownerQrCodeUrl || ''
     }, currentUser);
 
     setShowGymModal(false);
-    showToast(editingGym ? "Gym Updated in Firestore!" : "New Partner Gym Added!");
+    showToast(editingGym ? "Gym & 30% Split Settings Updated!" : "New Partner Gym Added!");
   };
 
   const handleDeleteGym = async (gymId) => {
@@ -271,6 +305,7 @@ export const OwnerDashboard = ({ setActiveTab }) => {
         password: trainer?.password || 'Trainer@123',
         gymId: trainer?.gymId || defaultGymId,
         price: trainer?.price || 280,
+        trainerSplitPercent: trainer?.trainerSplitPercent !== undefined ? trainer.trainerSplitPercent : 50,
         specialization: trainer?.specialization || 'Strength & Conditioning',
         experience: trainer?.experience || '5+ Years',
         image: trainer?.image || PRESET_TRAINER_IMAGES[0].url,
@@ -284,6 +319,7 @@ export const OwnerDashboard = ({ setActiveTab }) => {
         password: 'Trainer@123',
         gymId: defaultGymId,
         price: 280,
+        trainerSplitPercent: 50,
         specialization: 'Hypertrophy & Strength',
         experience: '5+ Years CSCS',
         image: PRESET_TRAINER_IMAGES[0].url,
@@ -304,11 +340,12 @@ export const OwnerDashboard = ({ setActiveTab }) => {
     await firestoreService.saveTrainer({
       ...trainerForm,
       trainerId: editingTrainer ? editingTrainer.trainerId : null,
+      trainerSplitPercent: Number(trainerForm.trainerSplitPercent) || 50,
       walletBalance: editingTrainer?.walletBalance || 0
     });
 
     setShowTrainerModal(false);
-    showToast(editingTrainer ? "Trainer Pro Updated!" : "New Trainer Added!");
+    showToast(editingTrainer ? "Trainer & 50% Split Settings Updated!" : "New Trainer Added!");
   };
 
   const handleDeleteTrainer = async (trainerId) => {
@@ -339,17 +376,38 @@ export const OwnerDashboard = ({ setActiveTab }) => {
   const handleApprovePayout = async (requestId) => {
     soundEffects.playClick();
     await firestoreService.approvePayout(requestId);
-    showToast("Payout Request Approved!");
+    showToast("Payout Request Approved & Recorded!");
   };
 
-  // Financial Analytics Calculations
+  // 20 / 30 / 50 Financial Analytics Calculations
   const grossRevenue = useMemo(() => {
     if (!Array.isArray(bookings)) return 0;
     return bookings.reduce((sum, b) => b?.status === 'VERIFIED' ? sum + (Number(b?.amount) || 280) : sum, 0);
   }, [bookings]);
 
-  const netOwnerShare = grossRevenue * 0.25;
-  const trainerSplitShare = grossRevenue * 0.75;
+  const totalPlatformShare = useMemo(() => {
+    if (!Array.isArray(bookings)) return 0;
+    return bookings.reduce((sum, b) => {
+      if (b?.status !== 'VERIFIED') return sum;
+      return sum + (Number(b?.platformShare) || Math.round((Number(b?.amount) || 280) * 0.20));
+    }, 0);
+  }, [bookings]);
+
+  const totalGymOwnersShare = useMemo(() => {
+    if (!Array.isArray(bookings)) return 0;
+    return bookings.reduce((sum, b) => {
+      if (b?.status !== 'VERIFIED') return sum;
+      return sum + (Number(b?.gymShare) || Math.round((Number(b?.amount) || 280) * 0.30));
+    }, 0);
+  }, [bookings]);
+
+  const totalTrainersShare = useMemo(() => {
+    if (!Array.isArray(bookings)) return 0;
+    return bookings.reduce((sum, b) => {
+      if (b?.status !== 'VERIFIED') return sum;
+      return sum + (Number(b?.trainerShare) || Math.round((Number(b?.amount) || 280) * 0.50));
+    }, 0);
+  }, [bookings]);
 
   // Peak Hours Distribution
   const peakStats = useMemo(() => {
@@ -372,7 +430,7 @@ export const OwnerDashboard = ({ setActiveTab }) => {
             <RefreshCw className="w-6 h-6" />
           </div>
           <h3 className="text-lg font-bold text-white font-outfit">Loading Master Admin Console...</h3>
-          <p className="text-xs text-slate-400">Synchronizing live Firestore records & analytics</p>
+          <p className="text-xs text-slate-400">Synchronizing live Firestore records & splits</p>
         </div>
       </div>
     );
@@ -403,10 +461,10 @@ export const OwnerDashboard = ({ setActiveTab }) => {
             </span>
           </div>
           <h1 className="text-3xl font-extrabold text-white font-outfit mt-1">
-            Platform Operations & Financial Analytics
+            20/30/50 Revenue Model & Platform Controls
           </h1>
           <p className="text-slate-400 text-sm mt-1">
-            Real-time Firestore synchronization, Razorpay settlement, and 75/25 trainer splits.
+            20% Platform (Snehith), 30% Gym Owners (Vinay), 50% Trainers. Real-time Firestore synchronization.
           </p>
         </div>
 
@@ -418,7 +476,7 @@ export const OwnerDashboard = ({ setActiveTab }) => {
             className="px-5 py-2.5 bg-gradient-to-r from-emerald-400 to-emerald-500 text-slate-950 font-black rounded-xl text-xs shadow-[0_0_20px_#34d399] hover:scale-105 transition-all flex items-center gap-2 border border-emerald-300"
           >
             <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
-            <span>{isSyncing ? 'Syncing...' : 'Save & Sync Changes to Website'}</span>
+            <span>{isSyncing ? 'Syncing...' : 'Save & Sync Changes to Live App'}</span>
           </button>
 
           <button
@@ -434,137 +492,71 @@ export const OwnerDashboard = ({ setActiveTab }) => {
           >
             <Plus className="w-4 h-4" /> Add Trainer Pro
           </button>
+
+          <button
+            onClick={() => setShowDeleteModal(true)}
+            title="Google Play Data Erasure"
+            className="p-2.5 bg-slate-900 border border-white/10 hover:border-rose-500 text-slate-400 hover:text-rose-400 rounded-xl text-xs transition-colors"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
         </div>
       </div>
 
-      {/* Analytics Cards Row */}
+      {/* 20 / 30 / 50 REVENUE BREAKDOWN CARDS */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        
+        {/* Gross Volume */}
         <div className="glass-panel p-5 rounded-3xl border border-white/10 space-y-2">
-          <span className="text-xs text-slate-400 font-medium">Platform Gross Revenue</span>
+          <div className="flex justify-between items-center">
+            <span className="text-xs text-slate-400 font-medium">Platform Gross Bookings</span>
+            <DollarSign className="w-4 h-4 text-slate-400" />
+          </div>
           <div className="text-3xl font-black text-white font-outfit">₹{grossRevenue}</div>
-          <span className="text-[10px] text-emerald-400 font-mono">100% Client Bookings</span>
+          <span className="text-[10px] text-emerald-400 font-mono">100% Client Payments</span>
         </div>
 
+        {/* Snehith's 20% Platform Share */}
         <div className="glass-panel p-5 rounded-3xl border border-electricBlue/30 bg-electricBlue/5 space-y-2">
-          <span className="text-xs text-electricBlue font-bold">Owner Net Share (25%)</span>
-          <div className="text-3xl font-black text-white font-outfit">₹{netOwnerShare}</div>
-          <span className="text-[10px] text-slate-400 font-mono">Platform Facilitation</span>
+          <div className="flex justify-between items-center">
+            <span className="text-xs text-electricBlue font-bold">Platform Net Share (20%)</span>
+            <ShieldCheck className="w-4 h-4 text-electricBlue" />
+          </div>
+          <div className="text-3xl font-black text-white font-outfit">₹{totalPlatformShare}</div>
+          <span className="text-[10px] text-slate-400 font-mono">Snehith Platform Retained</span>
         </div>
 
+        {/* Gym Owners' 30% Share */}
+        <div className="glass-panel p-5 rounded-3xl border border-emerald-400/30 bg-emerald-500/5 space-y-2">
+          <div className="flex justify-between items-center">
+            <span className="text-xs text-emerald-400 font-bold">Gym Owners Share (30%)</span>
+            <Building2 className="w-4 h-4 text-emerald-400" />
+          </div>
+          <div className="text-3xl font-black text-white font-outfit">₹{totalGymOwnersShare}</div>
+          <span className="text-[10px] text-slate-400 font-mono">Credited to Gym Wallets</span>
+        </div>
+
+        {/* Trainers' 50% Share */}
         <div className="glass-panel p-5 rounded-3xl border border-vibrantOrange/30 bg-vibrantOrange/5 space-y-2">
-          <span className="text-xs text-vibrantOrange font-bold">Trainers Payout Share (75%)</span>
-          <div className="text-3xl font-black text-white font-outfit">₹{trainerSplitShare}</div>
-          <span className="text-[10px] text-slate-400 font-mono">Trainer Wallets Credited</span>
-        </div>
-
-        <div className="glass-panel p-5 rounded-3xl border border-white/10 space-y-2">
-          <span className="text-xs text-slate-400 font-medium">Total Passes Issued</span>
-          <div className="text-3xl font-black text-white font-outfit">{(bookings || []).length}</div>
-          <span className="text-[10px] text-electricBlue font-mono">Live Firestore Count</span>
-        </div>
-      </div>
-
-      {/* VISUAL ANALYTICS & PEAK HOURS CHARTS */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        
-        {/* SVG Revenue Trend Line Chart */}
-        <div className="lg:col-span-8 glass-panel p-6 rounded-3xl border border-white/10 space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-base font-bold text-white font-outfit flex items-center gap-2">
-              <TrendingUp className="w-5 h-5 text-emerald-400" />
-              <span>Revenue Trend & Booking Momentum</span>
-            </h3>
-            <span className="text-xs font-mono text-slate-400">Live 7-Day Performance</span>
+          <div className="flex justify-between items-center">
+            <span className="text-xs text-vibrantOrange font-bold">Trainers Share (50%)</span>
+            <Users className="w-4 h-4 text-vibrantOrange" />
           </div>
-
-          {/* SVG Visual Graph */}
-          <div className="h-44 w-full relative flex items-end pt-6">
-            <svg viewBox="0 0 500 120" className="w-full h-full overflow-visible">
-              <defs>
-                <linearGradient id="chartGlow" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#00f0ff" stopOpacity="0.4" />
-                  <stop offset="100%" stopColor="#00f0ff" stopOpacity="0" />
-                </linearGradient>
-              </defs>
-              <path
-                d="M 0 110 Q 80 80, 160 90 T 320 40 T 500 20 L 500 120 L 0 120 Z"
-                fill="url(#chartGlow)"
-              />
-              <path
-                d="M 0 110 Q 80 80, 160 90 T 320 40 T 500 20"
-                fill="none"
-                stroke="#00f0ff"
-                strokeWidth="4"
-                className="drop-shadow-[0_0_10px_#00f0ff]"
-              />
-              <circle cx="160" cy="90" r="5" fill="#ff5500" stroke="#fff" strokeWidth="2" />
-              <circle cx="320" cy="40" r="5" fill="#34d399" stroke="#fff" strokeWidth="2" />
-              <circle cx="500" cy="20" r="6" fill="#00f0ff" stroke="#fff" strokeWidth="2" />
-            </svg>
-          </div>
-
-          <div className="flex justify-between text-[11px] text-slate-400 font-mono border-t border-white/5 pt-2">
-            <span>Day 1 (₹0)</span>
-            <span>Day 3 (₹280)</span>
-            <span>Day 5 (₹560)</span>
-            <span className="text-electricBlue font-bold">Today (₹{grossRevenue})</span>
-          </div>
-        </div>
-
-        {/* Peak Workout Hours Distribution */}
-        <div className="lg:col-span-4 glass-panel p-6 rounded-3xl border border-white/10 space-y-4 flex flex-col justify-between">
-          <div>
-            <h3 className="text-base font-bold text-white font-outfit flex items-center gap-2">
-              <Activity className="w-5 h-5 text-vibrantOrange" />
-              <span>Peak Workout Slot Demand</span>
-            </h3>
-            <p className="text-xs text-slate-400 mt-1">Client slot preference distribution</p>
-          </div>
-
-          <div className="space-y-4">
-            <div>
-              <div className="flex justify-between text-xs font-semibold mb-1">
-                <span className="text-white">Morning Sessions (06:00 - 11:00 AM)</span>
-                <span className="text-electricBlue font-mono">{Math.round((peakStats.morning / peakStats.total) * 100)}%</span>
-              </div>
-              <div className="w-full h-2.5 bg-slate-900 rounded-full overflow-hidden border border-white/5">
-                <div 
-                  className="h-full bg-electricBlue rounded-full shadow-[0_0_10px_#00f0ff]" 
-                  style={{ width: `${Math.round((peakStats.morning / peakStats.total) * 100)}%` }} 
-                />
-              </div>
-            </div>
-
-            <div>
-              <div className="flex justify-between text-xs font-semibold mb-1">
-                <span className="text-white">Evening Sessions (04:00 - 08:00 PM)</span>
-                <span className="text-vibrantOrange font-mono">{Math.round((peakStats.evening / peakStats.total) * 100)}%</span>
-              </div>
-              <div className="w-full h-2.5 bg-slate-900 rounded-full overflow-hidden border border-white/5">
-                <div 
-                  className="h-full bg-vibrantOrange rounded-full shadow-[0_0_10px_#ff5500]" 
-                  style={{ width: `${Math.round((peakStats.evening / peakStats.total) * 100)}%` }} 
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="p-3 rounded-2xl bg-slate-900/80 border border-white/5 text-[11px] text-slate-400">
-            💡 <strong>Insight:</strong> 06-08 AM & 06-08 PM are high-traffic slots for personal trainers.
-          </div>
+          <div className="text-3xl font-black text-white font-outfit">₹{totalTrainersShare}</div>
+          <span className="text-[10px] text-slate-400 font-mono">Credited to Trainer Wallets</span>
         </div>
 
       </div>
 
-      {/* GYMS & TRAINERS MANAGEMENT TABS */}
+      {/* GYMS & TRAINERS CONFIGURATION MANAGEMENT */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         
-        {/* Partner Gyms Column */}
+        {/* Partner Gyms with 30% Split & Owner Credentials */}
         <div className="lg:col-span-6 space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-bold text-white font-outfit flex items-center gap-2">
               <Building2 className="w-5 h-5 text-electricBlue" />
-              <span>Partner Gyms ({gyms?.length || 0})</span>
+              <span>Partner Gyms & Splits ({gyms?.length || 0})</span>
             </h3>
 
             <button
@@ -590,11 +582,18 @@ export const OwnerDashboard = ({ setActiveTab }) => {
                   />
                   <div className="overflow-hidden">
                     <h4 className="text-sm font-bold text-white truncate">{g?.name || 'Partner Gym'}</h4>
-                    <p className="text-xs text-slate-400 truncate">{g?.location || 'Hyderabad'}</p>
+                    <p className="text-xs text-slate-400 truncate">
+                      Owner: <strong className="text-white">{g?.ownerName || 'Vinay'}</strong> ({g?.ownerPhone || '9123456780'})
+                    </p>
                     <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-[10px] text-electricBlue font-bold font-mono">₹{g?.startingPrice || 280}/Slot</span>
-                      <span className="text-[10px] text-amber-400 flex items-center gap-0.5">
-                        <Star className="w-3 h-3 fill-amber-400" /> {g?.rating || 4.9}
+                      <span className="text-[10px] text-emerald-400 font-bold font-mono bg-emerald-500/10 px-1.5 py-0.5 rounded">
+                        Gym Split: {g?.gymSplitPercent !== undefined ? g.gymSplitPercent : 30}%
+                      </span>
+                      <span className="text-[10px] text-electricBlue font-bold font-mono">
+                        ₹{g?.startingPrice || 280}/Slot
+                      </span>
+                      <span className="text-[10px] text-slate-400 font-mono">
+                        Wallet: ₹{g?.walletBalance || 0}
                       </span>
                     </div>
                   </div>
@@ -603,6 +602,7 @@ export const OwnerDashboard = ({ setActiveTab }) => {
                 <div className="flex items-center space-x-2">
                   <button
                     onClick={() => handleOpenGymModal(g)}
+                    title="Configure Gym & Splits"
                     className="p-2 text-slate-400 hover:text-electricBlue hover:bg-electricBlue/10 rounded-lg transition-colors"
                   >
                     <Edit className="w-4 h-4" />
@@ -620,12 +620,12 @@ export const OwnerDashboard = ({ setActiveTab }) => {
           </div>
         </div>
 
-        {/* Trainers Column */}
+        {/* Trainers with 50% Split & Credentials */}
         <div className="lg:col-span-6 space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-bold text-white font-outfit flex items-center gap-2">
               <Users className="w-5 h-5 text-vibrantOrange" />
-              <span>Trainers ({trainers?.length || 0})</span>
+              <span>Trainers & 50% Splits ({trainers?.length || 0})</span>
             </h3>
 
             <button
@@ -654,13 +654,19 @@ export const OwnerDashboard = ({ setActiveTab }) => {
                     <div className="overflow-hidden">
                       <h4 className="text-sm font-bold text-white truncate">{t?.name || 'Trainer Pro'}</h4>
                       <p className="text-xs text-vibrantOrange font-medium truncate">{belongingGym?.name || 'Assigned Gym'}</p>
-                      <p className="text-[10px] text-slate-400 font-mono">Wallet: ₹{t?.walletBalance || 0}</p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-[10px] text-vibrantOrange font-bold font-mono bg-vibrantOrange/10 px-1.5 py-0.5 rounded">
+                          Trainer Split: {t?.trainerSplitPercent !== undefined ? t.trainerSplitPercent : 50}%
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-mono">Wallet: ₹{t?.walletBalance || 0}</span>
+                      </div>
                     </div>
                   </div>
 
                   <div className="flex items-center space-x-2">
                     <button
                       onClick={() => handleOpenTrainerModal(t)}
+                      title="Configure Trainer & Splits"
                       className="p-2 text-slate-400 hover:text-vibrantOrange hover:bg-vibrantOrange/10 rounded-lg transition-colors"
                     >
                       <Edit className="w-4 h-4" />
@@ -679,6 +685,76 @@ export const OwnerDashboard = ({ setActiveTab }) => {
           </div>
         </div>
 
+      </div>
+
+      {/* WITHDRAWAL APPROVAL QUEUES (TRAINERS & GYM OWNERS) */}
+      <div className="glass-panel p-6 rounded-3xl border border-white/10 space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-bold text-white font-outfit flex items-center gap-2">
+            <Clock className="w-5 h-5 text-emerald-400" />
+            <span>Master Payout Approval Queue (Trainers & Gym Owners)</span>
+          </h3>
+          <span className="text-xs text-slate-400 font-mono">{payoutRequests?.length || 0} Total Requests</span>
+        </div>
+
+        {(!payoutRequests || payoutRequests.length === 0) ? (
+          <p className="text-xs text-slate-500 italic">No payout requests pending.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs text-slate-300">
+              <thead className="bg-slate-900 text-slate-400 font-mono uppercase text-[10px]">
+                <tr>
+                  <th className="p-3 rounded-l-xl">Request ID</th>
+                  <th className="p-3">Beneficiary</th>
+                  <th className="p-3">Type</th>
+                  <th className="p-3">UPI ID</th>
+                  <th className="p-3">Amount</th>
+                  <th className="p-3">Status</th>
+                  <th className="p-3 rounded-r-xl">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {payoutRequests?.map((req) => (
+                  <tr key={req?.requestId || Math.random()} className="hover:bg-slate-900/50">
+                    <td className="p-3 font-mono font-bold text-electricBlue">{req?.requestId}</td>
+                    <td className="p-3 font-bold text-white">
+                      {req?.beneficiaryName || req?.trainerName || req?.ownerName}
+                      {req?.gymName && <span className="block text-[10px] text-slate-400 font-normal">{req.gymName}</span>}
+                    </td>
+                    <td className="p-3">
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                        req?.type === 'GYM_OWNER' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-vibrantOrange/20 text-vibrantOrange'
+                      }`}>
+                        {req?.type === 'GYM_OWNER' ? 'Gym Owner (30%)' : 'Trainer (50%)'}
+                      </span>
+                    </td>
+                    <td className="p-3 font-mono text-slate-300">{req?.upiId || 'Direct UPI'}</td>
+                    <td className="p-3 font-bold text-emerald-400">₹{req?.amountRequested}</td>
+                    <td className="p-3">
+                      <span className={`px-2 py-0.5 rounded-md font-bold text-[10px] ${
+                        req?.status === 'APPROVED' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'
+                      }`}>
+                        {req?.status === 'APPROVED' ? 'Transferred ✓' : req?.status}
+                      </span>
+                    </td>
+                    <td className="p-3">
+                      {req?.status === 'PENDING' ? (
+                        <button
+                          onClick={() => handleApprovePayout(req?.requestId)}
+                          className="px-3 py-1 bg-emerald-500 text-slate-950 font-bold rounded-lg text-[11px] hover:shadow-[0_0_10px_#34d399]"
+                        >
+                          Approve & Settle
+                        </button>
+                      ) : (
+                        <span className="text-[10px] text-slate-500">Settled</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* MASTER RAZORPAY & UPI GATEWAY CONFIGURATION */}
@@ -701,7 +777,7 @@ export const OwnerDashboard = ({ setActiveTab }) => {
           </div>
 
           <div className="md:col-span-4">
-            <label className="text-xs text-slate-300 block mb-1">Master Owner UPI ID</label>
+            <label className="text-xs text-slate-300 block mb-1">Master Owner UPI ID (Snehith 20%)</label>
             <input
               type="text"
               value={upiForm.ownerUpiId}
@@ -722,76 +798,23 @@ export const OwnerDashboard = ({ setActiveTab }) => {
         </form>
       </div>
 
-      {/* 12-HOUR PAYOUT APPROVAL TABLE */}
-      <div className="glass-panel p-6 rounded-3xl border border-white/10 space-y-4">
-        <h3 className="text-lg font-bold text-white font-outfit flex items-center gap-2">
-          <Clock className="w-5 h-5 text-vibrantOrange" />
-          <span>Trainer 12-Hour Payout Approval Queue</span>
-        </h3>
-
-        {(!payoutRequests || payoutRequests.length === 0) ? (
-          <p className="text-xs text-slate-500 italic">No payout requests pending.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs text-slate-300">
-              <thead className="bg-slate-900 text-slate-400 font-mono uppercase">
-                <tr>
-                  <th className="p-3 rounded-l-xl">Request ID</th>
-                  <th className="p-3">Trainer Name</th>
-                  <th className="p-3">Amount</th>
-                  <th className="p-3">Status</th>
-                  <th className="p-3 rounded-r-xl">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/5">
-                {payoutRequests?.map((req) => (
-                  <tr key={req?.requestId || Math.random()} className="hover:bg-slate-900/50">
-                    <td className="p-3 font-mono font-bold text-electricBlue">{req?.requestId}</td>
-                    <td className="p-3 font-bold text-white">{req?.trainerName}</td>
-                    <td className="p-3 font-bold text-vibrantOrange">₹{req?.amountRequested}</td>
-                    <td className="p-3">
-                      <span className={`px-2 py-0.5 rounded-md font-bold text-[10px] ${
-                        req?.status === 'APPROVED' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'
-                      }`}>
-                        {req?.status}
-                      </span>
-                    </td>
-                    <td className="p-3">
-                      {req?.status === 'PENDING' ? (
-                        <button
-                          onClick={() => handleApprovePayout(req?.requestId)}
-                          className="px-3 py-1 bg-emerald-500 text-slate-950 font-bold rounded-lg text-[11px] hover:shadow-[0_0_10px_#34d399]"
-                        >
-                          Approve Payout
-                        </button>
-                      ) : (
-                        <span className="text-[10px] text-slate-500">Transferred</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {/* GYM MODAL */}
+      {/* GYM MODAL WITH CUSTOM 30% SPLIT & OWNER CREDENTIALS */}
       {showGymModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
           <div className="glass-panel max-w-lg w-full rounded-3xl border border-electricBlue/40 p-6 space-y-4 shadow-2xl relative max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-white/10 pb-3">
               <h3 className="text-xl font-extrabold text-white font-outfit">
-                {editingGym ? 'Edit Partner Gym' : 'Add New Partner Gym'}
+                {editingGym ? 'Edit Partner Gym & Revenue Split' : 'Add New Partner Gym'}
               </h3>
               <button onClick={() => setShowGymModal(false)} className="text-slate-400 hover:text-white">✕</button>
             </div>
 
             <form onSubmit={handleSaveGym} className="space-y-4 text-xs">
               <div>
-                <label className="text-slate-300 font-bold block mb-1">Gym Name</label>
+                <label className="text-slate-300 font-bold block mb-1">Gym Facility Name</label>
                 <input
                   type="text"
+                  required
                   value={gymForm.name}
                   onChange={(e) => setGymForm({ ...gymForm, name: e.target.value })}
                   placeholder="e.g. GS fitness studio"
@@ -803,11 +826,64 @@ export const OwnerDashboard = ({ setActiveTab }) => {
                 <label className="text-slate-300 font-bold block mb-1">Location / Area</label>
                 <input
                   type="text"
+                  required
                   value={gymForm.location}
                   onChange={(e) => setGymForm({ ...gymForm, location: e.target.value })}
-                  placeholder="e.g. chengicherla, Hyderabad"
+                  placeholder="e.g. chengicherla , Hyderabad"
                   className="w-full bg-slate-900 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-electricBlue"
                 />
+              </div>
+
+              {/* Gym Owner Account Credentials */}
+              <div className="grid grid-cols-2 gap-3 p-3 rounded-2xl bg-slate-950 border border-white/10">
+                <div className="col-span-2 text-electricBlue font-bold font-mono text-[11px] flex items-center gap-1">
+                  <Building2 className="w-3.5 h-3.5" /> Gym Owner Login Details (e.g. Vinay)
+                </div>
+                <div>
+                  <label className="text-slate-400 block mb-1">Owner Name</label>
+                  <input
+                    type="text"
+                    value={gymForm.ownerName}
+                    onChange={(e) => setGymForm({ ...gymForm, ownerName: e.target.value })}
+                    placeholder="e.g. Vinay"
+                    className="w-full bg-slate-900 border border-white/10 rounded-lg px-3 py-2 text-white text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="text-slate-400 block mb-1">Owner Phone (Login ID)</label>
+                  <input
+                    type="tel"
+                    value={gymForm.ownerPhone}
+                    onChange={(e) => setGymForm({ ...gymForm, ownerPhone: e.target.value })}
+                    placeholder="e.g. 9123456780"
+                    className="w-full bg-slate-900 border border-white/10 rounded-lg px-3 py-2 text-white text-xs font-mono"
+                  />
+                </div>
+              </div>
+
+              {/* REVENUE SPLIT & PRICE */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-slate-300 font-bold block mb-1">Gym Split % (Default 30%)</label>
+                  <input
+                    type="number"
+                    min="5"
+                    max="60"
+                    value={gymForm.gymSplitPercent}
+                    onChange={(e) => setGymForm({ ...gymForm, gymSplitPercent: Number(e.target.value) })}
+                    className="w-full bg-slate-900 border border-emerald-400 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-slate-300 font-bold block mb-1">2-Hour Trial Slot Fee (₹)</label>
+                  <input
+                    type="number"
+                    value={gymForm.startingPrice}
+                    onChange={(e) => setGymForm({ ...gymForm, startingPrice: Number(e.target.value) })}
+                    className="w-full bg-slate-900 border border-electricBlue rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none font-mono"
+                  />
+                </div>
               </div>
 
               <div>
@@ -843,23 +919,6 @@ export const OwnerDashboard = ({ setActiveTab }) => {
                 </div>
               </div>
 
-              {/* TRIAL SLOT FEE */}
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="text-slate-300 font-bold">2-Hour Trial Slot Fee (₹)</label>
-                  <span className="text-[10px] text-emerald-400 font-mono font-bold flex items-center gap-1">
-                    <Unlock className="w-3 h-3" /> Unlocked (Super Admin)
-                  </span>
-                </div>
-
-                <input
-                  type="number"
-                  value={gymForm.startingPrice}
-                  onChange={(e) => setGymForm({ ...gymForm, startingPrice: Number(e.target.value) })}
-                  className="w-full bg-slate-900 border border-electricBlue rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none font-mono"
-                />
-              </div>
-
               <div className="flex justify-end gap-2 pt-2">
                 <button
                   type="button"
@@ -881,13 +940,13 @@ export const OwnerDashboard = ({ setActiveTab }) => {
         </div>
       )}
 
-      {/* TRAINER MODAL */}
+      {/* TRAINER MODAL WITH CUSTOM 50% SPLIT */}
       {showTrainerModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
           <div className="glass-panel max-w-lg w-full rounded-3xl border border-vibrantOrange/40 p-6 space-y-4 shadow-2xl relative max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-white/10 pb-3">
               <h3 className="text-xl font-extrabold text-white font-outfit">
-                {editingTrainer ? 'Edit Trainer Pro' : 'Add New Trainer Pro'}
+                {editingTrainer ? 'Edit Trainer & 50% Split' : 'Add New Trainer Pro'}
               </h3>
               <button onClick={() => setShowTrainerModal(false)} className="text-slate-400 hover:text-white">✕</button>
             </div>
@@ -897,6 +956,7 @@ export const OwnerDashboard = ({ setActiveTab }) => {
                 <label className="text-slate-300 font-bold block mb-1">Trainer Full Name</label>
                 <input
                   type="text"
+                  required
                   value={trainerForm.name}
                   onChange={(e) => setTrainerForm({ ...trainerForm, name: e.target.value })}
                   placeholder="e.g. Vikram Sharma"
@@ -917,15 +977,30 @@ export const OwnerDashboard = ({ setActiveTab }) => {
                 </select>
               </div>
 
-              <div>
-                <label className="text-slate-300 font-bold block mb-1">Phone Number (For Trainer Login)</label>
-                <input
-                  type="text"
-                  value={trainerForm.phone}
-                  onChange={(e) => setTrainerForm({ ...trainerForm, phone: e.target.value })}
-                  placeholder="e.g. 9030118909"
-                  className="w-full bg-slate-900 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-vibrantOrange"
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-slate-300 font-bold block mb-1">Phone Number (Login ID)</label>
+                  <input
+                    type="tel"
+                    required
+                    value={trainerForm.phone}
+                    onChange={(e) => setTrainerForm({ ...trainerForm, phone: e.target.value })}
+                    placeholder="e.g. 9030118909"
+                    className="w-full bg-slate-900 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-vibrantOrange font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-slate-300 font-bold block mb-1">Trainer Split % (Default 50%)</label>
+                  <input
+                    type="number"
+                    min="10"
+                    max="80"
+                    value={trainerForm.trainerSplitPercent}
+                    onChange={(e) => setTrainerForm({ ...trainerForm, trainerSplitPercent: Number(e.target.value) })}
+                    className="w-full bg-slate-900 border border-vibrantOrange rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none font-mono"
+                  />
+                </div>
               </div>
 
               <div>
@@ -1004,6 +1079,12 @@ export const OwnerDashboard = ({ setActiveTab }) => {
           </div>
         </div>
       )}
+
+      {/* Delete Account Modal */}
+      <DeleteAccountModal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+      />
 
     </div>
   );

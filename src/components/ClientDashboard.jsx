@@ -3,8 +3,9 @@ import { firestoreService } from '../services/firestoreService';
 import { soundEffects } from '../services/soundEffects';
 import { SafeImage } from './SafeImage';
 import { useAuth } from '../context/AuthContext';
+import { DeleteAccountModal } from "./DeleteAccountModal";
 import { 
-  Search, MapPin, Star, ShieldCheck, Dumbbell, Clock, 
+  Search, MapPin, Star, Trash2, ShieldCheck, Dumbbell, Clock, 
   Sparkles, ChevronRight, QrCode, CheckCircle2, Ticket, 
   Upload, Scan, AlertCircle, ArrowLeft, Calendar, User, 
   RefreshCw, CreditCard, MessageSquare, HelpCircle, X,
@@ -40,6 +41,7 @@ export const ClientDashboard = ({ activeTab = 'home', setActiveTab }) => {
   // FAQ & Policy Modals
   const [showFaqModal, setShowFaqModal] = useState(false);
   const [showPolicyModal, setShowPolicyModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [expandedFaqIndex, setExpandedFaqIndex] = useState(null);
 
   // Payment & OCR Scanner State
@@ -602,12 +604,23 @@ export const ClientDashboard = ({ activeTab = 'home', setActiveTab }) => {
               </p>
             </div>
 
-            <button
-              onClick={() => setActiveTab('home')}
-              className="px-4 py-2 bg-slate-800 text-white font-semibold text-xs rounded-xl hover:bg-slate-700 transition-colors"
-            >
-              + Book Another Slot
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setActiveTab('home')}
+                className="px-4 py-2 bg-slate-800 text-white font-semibold text-xs rounded-xl hover:bg-slate-700 transition-colors"
+              >
+                + Book Another Slot
+              </button>
+              {currentUser && (
+                <button
+                  onClick={() => setShowDeleteModal(true)}
+                  title="Google Play Data Erasure"
+                  className="p-2 bg-slate-800/80 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 border border-white/5 rounded-xl transition-colors"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              )}
+            </div>
           </div>
 
           {/* ACTIVE PASSES */}
