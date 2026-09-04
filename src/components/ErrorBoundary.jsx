@@ -1,5 +1,6 @@
 import React from 'react';
 import { ShieldAlert, RefreshCw } from 'lucide-react';
+import { crashlyticsService } from '../services/crashlyticsService';
 
 export class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -13,6 +14,11 @@ export class ErrorBoundary extends React.Component {
 
   componentDidCatch(error, errorInfo) {
     console.error("FITUP Protective Error Boundary caught an error:", error, errorInfo);
+    // Report to Firebase Crashlytics
+    crashlyticsService.recordError(error, {
+      componentStack: errorInfo?.componentStack || '',
+      source: 'React.ErrorBoundary'
+    }, false);
   }
 
   handleReset = () => {
@@ -34,7 +40,7 @@ export class ErrorBoundary extends React.Component {
                 Dashboard Recovered Safely
               </h2>
               <p className="text-xs text-slate-400 leading-relaxed">
-                A temporary data synchronization glitch was safely isolated. Your credentials and session remain secure.
+                A temporary data synchronization glitch was safely isolated and reported to Firebase diagnostics. Your credentials and session remain secure.
               </p>
             </div>
 

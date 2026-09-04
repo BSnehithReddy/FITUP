@@ -8,6 +8,10 @@ import { TrainerDashboard } from './components/TrainerDashboard';
 import { OwnerDashboard } from './components/OwnerDashboard';
 import { GymOwnerDashboard } from './components/GymOwnerDashboard';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { LegalModal } from './components/LegalModal';
+import { DeleteAccountModal } from './components/DeleteAccountModal';
+import { crashlyticsService } from './services/crashlyticsService';
+import { ShieldCheck, FileText, RefreshCw, Trash2, Bug } from 'lucide-react';
 
 const MainContent = () => {
   const { currentUser } = useAuth();
@@ -24,6 +28,21 @@ const MainContent = () => {
     return 'home';
   });
 
+  // State for Legal & Compliance Modal
+  const [legalModalOpen, setLegalModalOpen] = useState(false);
+  const [legalInitialTab, setLegalInitialTab] = useState('privacy');
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+
+  // Initialize Crashlytics on client load
+  useEffect(() => {
+    crashlyticsService.init();
+  }, []);
+
+  // Update Crashlytics user context whenever auth state changes
+  useEffect(() => {
+    crashlyticsService.setUser(currentUser);
+  }, [currentUser]);
+
   // Keep active tab in sync if user changes role or logs out
   useEffect(() => {
     if (activeTab === 'owner_dash' && (currentUser?.phone !== '9030118909' || currentUser?.role !== 'owner')) {
@@ -33,6 +52,11 @@ const MainContent = () => {
       setActiveTab('home');
     }
   }, [currentUser, activeTab]);
+
+  const openLegal = (tab) => {
+    setLegalInitialTab(tab);
+    setLegalModalOpen(true);
+  };
 
   return (
     <div className="min-h-screen bg-[#070b19] text-gray-100 flex flex-col selection:bg-electricBlue/30 selection:text-electricBlue safe-area-bottom">
@@ -44,35 +68,83 @@ const MainContent = () => {
       <main className="flex-1 pb-16">
         <ErrorBoundary>
           {(activeTab === 'home' || activeTab === 'my_bookings') && (
-            <ClientDashboard activeTab={activeTab} setActiveTab={setActiveTab} />
+            <ClientDashboard activeTab={activeTab} setActiveTab={setActiveTab} onOpenLegal={openLegal} />
           )}
 
           {activeTab === 'trainer_dash' && (
-            <TrainerDashboard />
+            <TrainerDashboard onOpenLegal={openLegal} />
           )}
 
           {activeTab === 'gym_owner_dash' && (
-            <GymOwnerDashboard />
+            <GymOwnerDashboard onOpenLegal={openLegal} />
           )}
 
           {activeTab === 'owner_dash' && (
-            <OwnerDashboard setActiveTab={setActiveTab} />
+            <OwnerDashboard setActiveTab={setActiveTab} onOpenLegal={openLegal} />
           )}
         </ErrorBoundary>
       </main>
 
-      {/* Footer */}
-      <footer className="border-t border-white/10 glass-panel py-8 text-center text-xs text-slate-500 space-y-2">
+      {/* Google Play Compliant Legal Footer */}
+      <footer className="border-t border-white/10 glass-panel py-8 px-4 text-center text-xs text-slate-500 space-y-4">
         <div className="flex items-center justify-center space-x-2 font-outfit font-bold text-slate-300">
           <span>FIT<span className="text-electricBlue">UP</span></span>
           <span>•</span>
           <span className="text-vibrantOrange">BOOK. LIFT. REPEAT.</span>
         </div>
-        <p>© {new Date().getFullYear()} FITUP Fitness Technologies. All rights reserved.</p>
+
+        {/* Legal and Compliance Links */}
+        <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-[11px] text-slate-400 font-medium">
+          <button 
+            onClick={() => openLegal('privacy')} 
+            className="hover:text-electricBlue transition-colors flex items-center gap-1"
+          >
+            <ShieldCheck className="w-3.5 h-3.5" /> Privacy Policy
+          </button>
+
+          <button 
+            onClick={() => openLegal('terms')} 
+            className="hover:text-electricBlue transition-colors flex items-center gap-1"
+          >
+            <FileText className="w-3.5 h-3.5" /> Terms & Conditions
+          </button>
+
+          <button 
+            onClick={() => openLegal('refund')} 
+            className="hover:text-electricBlue transition-colors flex items-center gap-1"
+          >
+            <RefreshCw className="w-3.5 h-3.5" /> Cancellation & Refunds
+          </button>
+
+          <button 
+            onClick={() => setDeleteModalOpen(true)} 
+            className="hover:text-rose-400 transition-colors flex items-center gap-1 text-slate-400"
+          >
+            <Trash2 className="w-3.5 h-3.5" /> Delete Account
+          </button>
+        </div>
+
+        <p className="text-[11px] text-slate-600">
+          © {new Date().getFullYear()} FITUP Fitness Technologies Private Limited. All rights reserved. • Google Play Store Verified
+        </p>
       </footer>
 
       {/* Authentication Modal */}
-      <AuthModal setActiveTab={setActiveTab} />
+      <AuthModal setActiveTab={setActiveTab} onOpenLegal={openLegal} />
+
+      {/* Legal & Compliance Modal */}
+      <LegalModal
+        isOpen={legalModalOpen}
+        onClose={() => setLegalModalOpen(false)}
+        initialTab={legalInitialTab}
+        onOpenDeleteAccount={() => setDeleteModalOpen(true)}
+      />
+
+      {/* Global Delete Account Modal */}
+      <DeleteAccountModal
+        isOpen={deleteModalOpen}
+        onClose={() => setDeleteModalOpen(false)}
+      />
 
     </div>
   );
