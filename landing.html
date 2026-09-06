@@ -1,0 +1,1162 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>FITUP - Single-Session Gym PT Slots from ₹200 | Book. Lift. Repeat.</title>
+    <meta name="description" content="Pay-per-session gym booking from ₹200/slot. 2-Hour floor access + 1-on-1 certified personal trainer. No ₹6000/month commitment. Total freedom.">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="assets/fitup-logo.png">
+    <link rel="apple-touch-icon" href="assets/fitup-logo.png">
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- FontAwesome 6 Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
+    <!-- Modern Styling -->
+    <style>
+        :root {
+            --bg-dark: #070b19;
+            --bg-card: rgba(15, 23, 42, 0.75);
+            --bg-card-hover: rgba(20, 30, 55, 0.85);
+            --border-glow: rgba(0, 240, 255, 0.25);
+            --cyan: #00f0ff;
+            --cyan-glow: rgba(0, 240, 255, 0.4);
+            --orange: #ff5500;
+            --orange-glow: rgba(255, 85, 0, 0.4);
+            --emerald: #10b981;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --font-display: 'Outfit', sans-serif;
+            --font-body: 'Inter', sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        html, body {
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            font-family: var(--font-body);
+            overflow-x: hidden;
+            touch-action: manipulation;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* Typography */
+        h1, h2, h3, h4, .font-heading {
+            font-family: var(--font-display);
+        }
+
+        /* Ambient Cosmic Background */
+        .ambient-glow-1 {
+            position: absolute;
+            top: -100px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 700px;
+            height: 500px;
+            background: radial-gradient(circle, rgba(0, 240, 255, 0.12) 0%, rgba(255, 85, 0, 0.06) 50%, transparent 70%);
+            filter: blur(80px);
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .ambient-glow-2 {
+            position: absolute;
+            top: 45%;
+            right: -150px;
+            width: 500px;
+            height: 500px;
+            background: radial-gradient(circle, rgba(255, 85, 0, 0.08) 0%, transparent 70%);
+            filter: blur(90px);
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        /* Canvas Particle Layer */
+        #galaxyCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 2;
+            pointer-events: auto;
+        }
+
+        /* Glassmorphism & Containers */
+        .glass-panel {
+            background: var(--bg-card);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 24px;
+        }
+
+        .glass-card {
+            background: linear-gradient(135deg, rgba(15, 23, 42, 0.85) 0%, rgba(10, 15, 30, 0.95) 100%);
+            backdrop-filter: blur(14px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 20px;
+            transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .glass-card:hover {
+            transform: translateY(-4px);
+            border-color: rgba(0, 240, 255, 0.4);
+            box-shadow: 0 15px 35px rgba(0, 240, 255, 0.12);
+        }
+
+        /* Buttons */
+        .btn-primary {
+            background: linear-gradient(135deg, #00f0ff 0%, #00a2ff 50%, #ff5500 100%);
+            background-size: 200% auto;
+            color: #070b19;
+            font-weight: 800;
+            font-family: var(--font-display);
+            border: none;
+            border-radius: 14px;
+            padding: 14px 28px;
+            font-size: 15px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            text-decoration: none;
+            box-shadow: 0 0 25px rgba(0, 240, 255, 0.45);
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary:hover {
+            background-position: right center;
+            box-shadow: 0 0 35px rgba(255, 85, 0, 0.6);
+            transform: scale(1.03);
+        }
+
+        .btn-secondary {
+            background: rgba(15, 23, 42, 0.8);
+            color: #fff;
+            font-weight: 700;
+            font-family: var(--font-display);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 14px;
+            padding: 13px 26px;
+            font-size: 15px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }
+
+        .btn-secondary:hover {
+            border-color: var(--cyan);
+            background: rgba(0, 240, 255, 0.08);
+            color: var(--cyan);
+            box-shadow: 0 0 20px rgba(0, 240, 255, 0.2);
+            transform: translateY(-2px);
+        }
+
+        /* Badges & Text Accents */
+        .badge-glow {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 14px;
+            background: rgba(0, 240, 255, 0.08);
+            border: 1px solid rgba(0, 240, 255, 0.3);
+            border-radius: 100px;
+            color: var(--cyan);
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            box-shadow: 0 0 15px rgba(0, 240, 255, 0.2);
+        }
+
+        .text-gradient-cyan {
+            background: linear-gradient(135deg, #ffffff 0%, #00f0ff 60%, #00a2ff 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .text-gradient-orange {
+            background: linear-gradient(135deg, #ff7700 0%, #ff5500 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        /* Layout Grid */
+        .max-w-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        /* Section Spacing */
+        section {
+            position: relative;
+            padding: 90px 0;
+            z-index: 3;
+        }
+
+        @media (max-width: 768px) {
+            section {
+                padding: 60px 0;
+            }
+        }
+
+        /* Hero Container */
+        .hero-section {
+            min-height: 92vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            position: relative;
+            padding-top: 110px;
+            padding-bottom: 60px;
+            overflow: hidden;
+        }
+
+        .hero-content {
+            position: relative;
+            z-index: 4;
+            max-width: 850px;
+            margin: 0 auto;
+        }
+
+        /* Pulse Animation */
+        @keyframes pulseGlow {
+            0%, 100% { opacity: 0.6; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.04); }
+        }
+
+        .pulse-slow {
+            animation: pulseGlow 4s infinite ease-in-out;
+        }
+
+        /* Interactive Card Grid */
+        .grid-3 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 24px;
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 28px;
+        }
+
+        /* Feature Icons */
+        .icon-box-cyan {
+            width: 52px;
+            height: 52px;
+            border-radius: 16px;
+            background: rgba(0, 240, 255, 0.1);
+            border: 1px solid rgba(0, 240, 255, 0.3);
+            color: var(--cyan);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            margin-bottom: 18px;
+            box-shadow: 0 0 15px rgba(0, 240, 255, 0.2);
+        }
+
+        .icon-box-orange {
+            width: 52px;
+            height: 52px;
+            border-radius: 16px;
+            background: rgba(255, 85, 0, 0.1);
+            border: 1px solid rgba(255, 85, 0, 0.3);
+            color: var(--orange);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            margin-bottom: 18px;
+            box-shadow: 0 0 15px rgba(255, 85, 0, 0.2);
+        }
+
+        /* Step Numbers */
+        .step-number {
+            font-family: var(--font-display);
+            font-size: 42px;
+            font-weight: 900;
+            line-height: 1;
+            background: linear-gradient(180deg, rgba(0, 240, 255, 0.5) 0%, rgba(0, 240, 255, 0.05) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 8px;
+        }
+
+        /* Gym Showcase Image */
+        .gym-img-wrapper {
+            position: relative;
+            height: 200px;
+            border-radius: 16px;
+            overflow: hidden;
+            margin-bottom: 16px;
+        }
+
+        .gym-img-wrapper img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.5s ease;
+        }
+
+        .glass-card:hover .gym-img-wrapper img {
+            transform: scale(1.06);
+        }
+
+        /* Amenity Pill */
+        .amenity-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 4px 10px;
+            border-radius: 8px;
+            font-size: 11px;
+            color: #cbd5e1;
+        }
+
+        /* Navbar */
+        .navbar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            z-index: 100;
+            background: rgba(7, 11, 25, 0.85);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 16px 0;
+        }
+
+        .nav-inner {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .brand-logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-decoration: none;
+        }
+
+        .logo-box {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            background: #0f172a;
+            border: 1px solid rgba(0, 240, 255, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 15px rgba(0, 240, 255, 0.25);
+            padding: 2px;
+        }
+
+        .logo-box img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .logo-text {
+            font-family: var(--font-display);
+            font-size: 24px;
+            font-weight: 900;
+            color: #fff;
+            letter-spacing: 0.05em;
+        }
+
+        .logo-text span {
+            color: var(--cyan);
+            text-shadow: 0 0 10px rgba(0, 240, 255, 0.5);
+        }
+
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 28px;
+        }
+
+        .nav-link {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 600;
+            transition: color 0.2s;
+        }
+
+        .nav-link:hover {
+            color: var(--cyan);
+        }
+
+        @media (max-width: 900px) {
+            .nav-links {
+                display: none;
+            }
+        }
+
+        /* Floating Touch Indicator */
+        .touch-hint {
+            position: absolute;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 5;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.5);
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(8px);
+            padding: 6px 14px;
+            border-radius: 100px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            pointer-events: none;
+        }
+
+        /* Comparison Matrix */
+        .comp-table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+
+        .comp-table th, .comp-table td {
+            padding: 14px 18px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+            font-size: 13px;
+        }
+
+        /* Footer */
+        footer {
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            background: rgba(5, 8, 18, 0.95);
+            padding: 50px 0 25px 0;
+            position: relative;
+            z-index: 10;
+        }
+
+        .footer-bottom {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding-top: 25px;
+            margin-top: 30px;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .tc-apply-notice {
+            font-size: 10px;
+            color: rgba(148, 163, 184, 0.45);
+            font-style: italic;
+            letter-spacing: 0.04em;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Ambient Cosmic Lighting -->
+    <div class="ambient-glow-1"></div>
+    <div class="ambient-glow-2"></div>
+
+    <!-- Navigation Header -->
+    <header class="navbar">
+        <div class="max-w-container nav-inner">
+            <a href="#" class="brand-logo">
+                <div class="logo-box">
+                    <img src="assets/fitup-logo.png" alt="FITUP" onerror="this.src='https://res.cloudinary.com/dwyx9l6tl/image/upload/v1724610141/fitup-logo_sckq1q.png'">
+                </div>
+                <div class="logo-text">
+                    FIT<span>UP</span>
+                </div>
+            </a>
+
+            <nav class="nav-links">
+                <a href="#how-it-works" class="nav-link">How It Works</a>
+                <a href="#partner-gyms" class="nav-link">Partner Gyms</a>
+                <a href="#amenities" class="nav-link">Amenities & Guarantee</a>
+                <a href="#pricing" class="nav-link">Pay-Per-Session</a>
+            </nav>
+
+            <div style="display: flex; gap: 12px; align-items: center;">
+                <a href="./index.html" class="btn-primary" style="padding: 10px 20px; font-size: 13px;">
+                    <i class="fa-solid fa-bolt"></i> Launch App
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- TOP HERO SECTION WITH INTERACTIVE CANVAS -->
+    <section class="hero-section">
+        <!-- Interactive 60FPS Starfield & Constellation Canvas -->
+        <canvas id="galaxyCanvas"></canvas>
+
+        <div class="max-w-container hero-content">
+            
+            <div class="badge-glow pulse-slow" style="margin-bottom: 22px;">
+                <i class="fa-solid fa-sparkles"></i>
+                <span>NO SUBSCRIPTIONS • 100% FREEDOM • PAY PER WORKOUT</span>
+            </div>
+
+            <h1 style="font-size: clamp(2.4rem, 6vw, 4.2rem); font-weight: 900; line-height: 1.08; letter-spacing: -0.02em; margin-bottom: 20px;">
+                BOOK. LIFT. <span class="text-gradient-cyan">REPEAT.</span><br>
+                <span class="text-gradient-orange">ZERO MONTHLY LOCK-INS.</span>
+            </h1>
+
+            <p style="font-size: clamp(0.95rem, 2vw, 1.2rem); color: #cbd5e1; line-height: 1.6; max-width: 720px; margin: 0 auto 30px auto;">
+                Experience premium 2-hour workout passes with certified 1-on-1 personal training at top local fitness centers starting at just <strong>₹200 per slot</strong>. Never waste money on unused gym memberships again.
+            </p>
+
+            <!-- Live Price Highlight Pill -->
+            <div style="display: inline-flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-bottom: 35px;">
+                <div class="amenity-pill" style="padding: 8px 16px; background: rgba(0, 240, 255, 0.08); border-color: rgba(0, 240, 255, 0.3); color: #fff;">
+                    <i class="fa-solid fa-tag text-cyan" style="color: var(--cyan);"></i>
+                    <span>Trial Slots: <strong>₹200 - ₹280</strong> / 2-Hrs</span>
+                </div>
+                <div class="amenity-pill" style="padding: 8px 16px; background: rgba(16, 185, 129, 0.08); border-color: rgba(16, 185, 129, 0.3); color: #fff;">
+                    <i class="fa-solid fa-user-check text-emerald" style="color: var(--emerald);"></i>
+                    <span>Certified Personal Trainer Included</span>
+                </div>
+                <div class="amenity-pill" style="padding: 8px 16px; background: rgba(255, 85, 0, 0.08); border-color: rgba(255, 85, 0, 0.3); color: #fff;">
+                    <i class="fa-solid fa-shield-halved text-orange" style="color: var(--orange);"></i>
+                    <span>100% Instant Refund Guarantee</span>
+                </div>
+            </div>
+
+            <!-- Hero Action Buttons -->
+            <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 16px; margin-bottom: 40px;">
+                <a href="./index.html" class="btn-primary" style="padding: 16px 36px; font-size: 16px;">
+                    <i class="fa-solid fa-dumbbell"></i> Explore Gyms & Book Slot
+                </a>
+                <a href="#download" class="btn-secondary" style="padding: 16px 30px; font-size: 16px;">
+                    <i class="fa-brands fa-google-play"></i> Get Android App
+                </a>
+            </div>
+
+            <!-- Micro Metrics Trust Bar -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 16px; max-width: 650px; margin: 0 auto; padding-top: 10px;">
+                <div style="text-align: center;">
+                    <div style="font-family: var(--font-display); font-size: 22px; font-weight: 800; color: #fff;">4.9 ★</div>
+                    <div style="font-size: 11px; color: var(--text-muted);">Verified User Rating</div>
+                </div>
+                <div style="text-align: center;">
+                    <div style="font-family: var(--font-display); font-size: 22px; font-weight: 800; color: var(--cyan);">₹200</div>
+                    <div style="font-size: 11px; color: var(--text-muted);">Starting Price/Session</div>
+                </div>
+                <div style="text-align: center;">
+                    <div style="font-family: var(--font-display); font-size: 22px; font-weight: 800; color: var(--orange);">100%</div>
+                    <div style="font-size: 11px; color: var(--text-muted);">Verified Facilities</div>
+                </div>
+                <div style="text-align: center;">
+                    <div style="font-family: var(--font-display); font-size: 22px; font-weight: 800; color: var(--emerald);">0 Lock-in</div>
+                    <div style="font-size: 11px; color: var(--text-muted);">Cancel Anytime</div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Touch Hint on Canvas -->
+        <div class="touch-hint">
+            <i class="fa-solid fa-hand-pointer" style="color: var(--cyan);"></i>
+            <span>Touch or drag screen to interact with the galaxy starfield</span>
+        </div>
+    </section>
+
+    <!-- SECTION 1: THE SUBSCRIPTION PROBLEM VS FITUP REVOLUTION -->
+    <section id="pricing">
+        <div class="max-w-container">
+            <div style="text-align: center; max-width: 680px; margin: 0 auto 50px auto;">
+                <div class="badge-glow" style="margin-bottom: 14px;">
+                    <i class="fa-solid fa-fire"></i>
+                    <span>THE GYM MEMBERSHIP TRAP IS OVER</span>
+                </div>
+                <h2 style="font-size: clamp(1.8rem, 4vw, 2.8rem); font-weight: 800; line-height: 1.15; margin-bottom: 16px;">
+                    Why Pay For 365 Days When You Only Work Out 50?
+                </h2>
+                <p style="color: var(--text-muted); font-size: 14px; line-height: 1.6;">
+                    Traditional gyms rely on you paying ₹6,000 to ₹15,000 upfront and never showing up. FITUP flips the fitness industry with on-demand access.
+                </p>
+            </div>
+
+            <!-- Comparison Table Card -->
+            <div class="glass-card" style="padding: 28px; max-width: 850px; margin: 0 auto; border-color: rgba(0, 240, 255, 0.2);">
+                <div style="overflow-x: auto;">
+                    <table class="comp-table">
+                        <thead>
+                            <tr style="border-bottom: 2px solid rgba(255,255,255,0.1);">
+                                <th style="color: var(--text-muted); font-size: 14px;">Feature</th>
+                                <th style="color: #ef4444; font-size: 14px;"><i class="fa-solid fa-xmark"></i> Traditional Gyms</th>
+                                <th style="color: var(--cyan); font-size: 14px;"><i class="fa-solid fa-check-double"></i> FITUP Model</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td style="font-weight: 600;">Payment Model</td>
+                                <td style="color: #f87171;">₹6,000 - ₹15,000 Upfront Lock-in</td>
+                                <td style="color: #38bdf8; font-weight: 700;">₹200 - ₹280 Pay-Per-Session</td>
+                            </tr>
+                            <tr>
+                                <td style="font-weight: 600;">Personal Training</td>
+                                <td style="color: #f87171;">Extra ₹4,000 - ₹8,000 / Month</td>
+                                <td style="color: #38bdf8; font-weight: 700;">1-on-1 PT Included with Every Slot</td>
+                            </tr>
+                            <tr>
+                                <td style="font-weight: 600;">Location Flexibility</td>
+                                <td style="color: #f87171;">Tied down to a single location</td>
+                                <td style="color: #38bdf8; font-weight: 700;">Access multiple verified partner gyms</td>
+                            </tr>
+                            <tr>
+                                <td style="font-weight: 600;">Commitment & Penalties</td>
+                                <td style="color: #f87171;">Annual contracts & admission charges</td>
+                                <td style="color: #38bdf8; font-weight: 700;">Zero commitments, zero registration fees</td>
+                            </tr>
+                            <tr>
+                                <td style="font-weight: 600;">Refund Policy</td>
+                                <td style="color: #f87171;">Strictly Non-Refundable</td>
+                                <td style="color: #38bdf8; font-weight: 700;">100% Instant Refund Policy</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div style="text-align: center; margin-top: 24px;">
+                    <a href="./index.html" class="btn-primary" style="padding: 12px 28px; font-size: 14px;">
+                        Try a Single Session Today <i class="fa-solid fa-arrow-right"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- SECTION 2: HOW IT WORKS (3-STEP GUIDE) -->
+    <section id="how-it-works" style="background: rgba(10, 16, 32, 0.4);">
+        <div class="max-w-container">
+            <div style="text-align: center; max-width: 650px; margin: 0 auto 50px auto;">
+                <div class="badge-glow" style="margin-bottom: 14px;">
+                    <i class="fa-solid fa-bolt"></i>
+                    <span>EFFORTLESS FITNESS IN 3 SIMPLE STEPS</span>
+                </div>
+                <h2 style="font-size: clamp(1.8rem, 4vw, 2.8rem); font-weight: 800; line-height: 1.15; margin-bottom: 16px;">
+                    Search. Book. Play.
+                </h2>
+                <p style="color: var(--text-muted); font-size: 14px; line-height: 1.6;">
+                    No tedious signups, no sales calls. Discover gyms near you and get your digital QR workout pass instantly.
+                </p>
+            </div>
+
+            <div class="grid-3">
+                <!-- Step 1 -->
+                <div class="glass-card" style="padding: 32px 24px;">
+                    <div class="step-number">01</div>
+                    <div class="icon-box-cyan">
+                        <i class="fa-solid fa-magnifying-glass-location"></i>
+                    </div>
+                    <h3 style="font-size: 20px; font-weight: 800; margin-bottom: 12px; color: #fff;">Search & Discover</h3>
+                    <p style="color: var(--text-muted); font-size: 13px; line-height: 1.6;">
+                        Explore certified partner gyms in your area with real photos, equipment ratings, location maps, and verified user reviews.
+                    </p>
+                </div>
+
+                <!-- Step 2 -->
+                <div class="glass-card" style="padding: 32px 24px; border-color: rgba(255, 85, 0, 0.3);">
+                    <div class="step-number" style="background: linear-gradient(180deg, rgba(255, 85, 0, 0.5) 0%, rgba(255, 85, 0, 0.05) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">02</div>
+                    <div class="icon-box-orange">
+                        <i class="fa-solid fa-calendar-check"></i>
+                    </div>
+                    <h3 style="font-size: 20px; font-weight: 800; margin-bottom: 12px; color: #fff;">Book Your 2-Hr Slot</h3>
+                    <p style="color: var(--text-muted); font-size: 13px; line-height: 1.6;">
+                        Select your preferred 2-hour workout window and match with an expert personal trainer (Strength, Cardio, Hypertrophy, or Mobility).
+                    </p>
+                </div>
+
+                <!-- Step 3 -->
+                <div class="glass-card" style="padding: 32px 24px;">
+                    <div class="step-number">03</div>
+                    <div class="icon-box-cyan">
+                        <i class="fa-solid fa-qrcode"></i>
+                    </div>
+                    <h3 style="font-size: 20px; font-weight: 800; margin-bottom: 12px; color: #fff;">Scan & Lift</h3>
+                    <p style="color: var(--text-muted); font-size: 13px; line-height: 1.6;">
+                        Arrive at the gym, flash your digital pass QR code at the desk, train with your dedicated trainer, and repeat whenever you want.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- SECTION 3: VERIFIED PARTNER GYMS SHOWCASE -->
+    <section id="partner-gyms">
+        <div class="max-w-container">
+            <div style="text-align: center; max-width: 650px; margin: 0 auto 50px auto;">
+                <div class="badge-glow" style="margin-bottom: 14px;">
+                    <i class="fa-solid fa-building"></i>
+                    <span>TOP-TIER LOCAL FACILITIES</span>
+                </div>
+                <h2 style="font-size: clamp(1.8rem, 4vw, 2.8rem); font-weight: 800; line-height: 1.15; margin-bottom: 16px;">
+                    Verified Partner Fitness Studios
+                </h2>
+                <p style="color: var(--text-muted); font-size: 14px; line-height: 1.6;">
+                    Every partner gym on FITUP is physically audited for equipment standards, cleanliness, AC cooling, and certified trainer qualifications.
+                </p>
+            </div>
+
+            <div class="grid-2">
+                <!-- Gym Card 1: GS Fitness Studio -->
+                <div class="glass-card" style="padding: 24px;">
+                    <div class="gym-img-wrapper">
+                        <img src="https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&w=800&q=80" alt="GS Fitness Studio">
+                        <div style="position: absolute; top: 12px; right: 12px; background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(255, 215, 0, 0.4); padding: 4px 10px; border-radius: 8px; font-size: 12px; font-weight: 800; color: #fbbf24;">
+                            <i class="fa-solid fa-star"></i> 4.9 (42 reviews)
+                        </div>
+                    </div>
+
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+                        <div>
+                            <h3 style="font-size: 22px; font-weight: 800; color: #fff;">GS Fitness Studio</h3>
+                            <p style="color: var(--text-muted); font-size: 12px;"><i class="fa-solid fa-location-dot" style="color: var(--cyan);"></i> Main Road, Chengicherla, Hyderabad</p>
+                        </div>
+                        <div style="text-align: right;">
+                            <div style="font-size: 10px; color: var(--text-muted); text-transform: uppercase;">Starting at</div>
+                            <div style="font-size: 22px; font-weight: 900; color: var(--cyan);">₹280<span style="font-size: 12px; color: var(--text-muted); font-weight: normal;">/slot</span></div>
+                        </div>
+                    </div>
+
+                    <!-- Amenities -->
+                    <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px;">
+                        <span class="amenity-pill"><i class="fa-solid fa-snowflake"></i> Central AC</span>
+                        <span class="amenity-pill"><i class="fa-solid fa-lock"></i> Free Locker</span>
+                        <span class="amenity-pill"><i class="fa-solid fa-hot-tub-person"></i> Steam Bath</span>
+                        <span class="amenity-pill"><i class="fa-solid fa-bottle-water"></i> Protein Bar</span>
+                    </div>
+
+                    <a href="./index.html" class="btn-primary" style="width: 100%; font-size: 14px; padding: 12px;">
+                        Book Slot at GS Fitness <i class="fa-solid fa-chevron-right"></i>
+                    </a>
+                </div>
+
+                <!-- Gym Card 2: Fusion Fitness -->
+                <div class="glass-card" style="padding: 24px;">
+                    <div class="gym-img-wrapper">
+                        <img src="https://images.unsplash.com/photo-1540497077202-7c8a3999166f?auto=format&fit=crop&w=800&q=80" alt="Fusion Fitness">
+                        <div style="position: absolute; top: 12px; right: 12px; background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(255, 215, 0, 0.4); padding: 4px 10px; border-radius: 8px; font-size: 12px; font-weight: 800; color: #fbbf24;">
+                            <i class="fa-solid fa-star"></i> 4.8 (38 reviews)
+                        </div>
+                    </div>
+
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+                        <div>
+                            <h3 style="font-size: 22px; font-weight: 800; color: #fff;">Fusion Fitness</h3>
+                            <p style="color: var(--text-muted); font-size: 12px;"><i class="fa-solid fa-location-dot" style="color: var(--cyan);"></i> Commercial Complex, Chengicherla, Hyderabad</p>
+                        </div>
+                        <div style="text-align: right;">
+                            <div style="font-size: 10px; color: var(--text-muted); text-transform: uppercase;">Starting at</div>
+                            <div style="font-size: 22px; font-weight: 900; color: var(--orange);">₹250<span style="font-size: 12px; color: var(--text-muted); font-weight: normal;">/slot</span></div>
+                        </div>
+                    </div>
+
+                    <!-- Amenities -->
+                    <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px;">
+                        <span class="amenity-pill"><i class="fa-solid fa-dumbbell"></i> Crossfit Zone</span>
+                        <span class="amenity-pill"><i class="fa-solid fa-heart-pulse"></i> Cardio Deck</span>
+                        <span class="amenity-pill"><i class="fa-solid fa-temperature-arrow-up"></i> Sauna</span>
+                        <span class="amenity-pill"><i class="fa-solid fa-medal"></i> Pro Trainers</span>
+                    </div>
+
+                    <a href="./index.html" class="btn-primary" style="width: 100%; font-size: 14px; padding: 12px;">
+                        Book Slot at Fusion Fitness <i class="fa-solid fa-chevron-right"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- SECTION 4: PREMIUM AMENITIES & 100% REFUND GUARANTEE -->
+    <section id="amenities" style="background: rgba(10, 16, 32, 0.4);">
+        <div class="max-w-container">
+            <div style="text-align: center; max-width: 650px; margin: 0 auto 50px auto;">
+                <div class="badge-glow" style="margin-bottom: 14px;">
+                    <i class="fa-solid fa-shield-heart"></i>
+                    <span>GUARANTEED SAFETY & SATISFACTION</span>
+                </div>
+                <h2 style="font-size: clamp(1.8rem, 4vw, 2.8rem); font-weight: 800; line-height: 1.15; margin-bottom: 16px;">
+                    Premium Amenities & 100% Refund Policy
+                </h2>
+                <p style="color: var(--text-muted); font-size: 14px; line-height: 1.6;">
+                    Every single workout pass booked on FITUP comes with VIP perks and a zero-risk money-back guarantee.
+                </p>
+            </div>
+
+            <div class="grid-3">
+                <div class="glass-card" style="padding: 28px;">
+                    <div class="icon-box-cyan"><i class="fa-solid fa-snowflake"></i></div>
+                    <h3 style="font-size: 18px; font-weight: 800; margin-bottom: 8px; color: #fff;">Climate-Controlled AC</h3>
+                    <p style="color: var(--text-muted); font-size: 13px; line-height: 1.5;">
+                        Train in comfortable, well-ventilated air-conditioned zones designed for peak athletic output.
+                    </p>
+                </div>
+
+                <div class="glass-card" style="padding: 28px;">
+                    <div class="icon-box-orange"><i class="fa-solid fa-lock"></i></div>
+                    <h3 style="font-size: 18px; font-weight: 800; margin-bottom: 8px; color: #fff;">Free Secure Lockers</h3>
+                    <p style="color: var(--text-muted); font-size: 13px; line-height: 1.5;">
+                        Store your personal gear and valuables safely with complimentary digital or keyed locker facilities.
+                    </p>
+                </div>
+
+                <div class="glass-card" style="padding: 28px;">
+                    <div class="icon-box-cyan"><i class="fa-solid fa-hand-holding-dollar"></i></div>
+                    <h3 style="font-size: 18px; font-weight: 800; margin-bottom: 8px; color: #fff;">100% Instant Refund</h3>
+                    <p style="color: var(--text-muted); font-size: 13px; line-height: 1.5;">
+                        If your trainer is unavailable or payment verification cannot be completed, get an instant 100% refund.
+                    </p>
+                </div>
+
+                <div class="glass-card" style="padding: 28px;">
+                    <div class="icon-box-orange"><i class="fa-solid fa-clock-rotate-left"></i></div>
+                    <h3 style="font-size: 18px; font-weight: 800; margin-bottom: 8px; color: #fff;">2-Hour Free Reschedule</h3>
+                    <p style="color: var(--text-muted); font-size: 13px; line-height: 1.5;">
+                        Change in schedule? Easily cancel or reschedule your slot free of charge up to 2 hours before start time.
+                    </p>
+                </div>
+
+                <div class="glass-card" style="padding: 28px;">
+                    <div class="icon-box-cyan"><i class="fa-solid fa-shower"></i></div>
+                    <h3 style="font-size: 18px; font-weight: 800; margin-bottom: 8px; color: #fff;">Showers & Steam Bath</h3>
+                    <p style="color: var(--text-muted); font-size: 13px; line-height: 1.5;">
+                        Refresh after intense lifting with clean shower areas, steam bath, and sauna amenities.
+                    </p>
+                </div>
+
+                <div class="glass-card" style="padding: 28px;">
+                    <div class="icon-box-orange"><i class="fa-solid fa-handshake"></i></div>
+                    <h3 style="font-size: 18px; font-weight: 800; margin-bottom: 8px; color: #fff;">Fair 20/30/50 Revenue Split</h3>
+                    <p style="color: var(--text-muted); font-size: 13px; line-height: 1.5;">
+                        Supporting local fitness: 50% goes directly to the trainer, 30% to the gym, and 20% to platform maintenance.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- SECTION 5: APP DOWNLOAD & MOBILE FLYER QR CTA -->
+    <section id="download">
+        <div class="max-w-container">
+            <div class="glass-card" style="padding: 48px 32px; background: linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(10, 15, 30, 0.98) 100%); border-color: rgba(0, 240, 255, 0.35); text-align: center; max-width: 900px; margin: 0 auto; box-shadow: 0 0 50px rgba(0, 240, 255, 0.15);">
+                
+                <div class="badge-glow pulse-slow" style="margin-bottom: 20px;">
+                    <i class="fa-solid fa-mobile-screen-button"></i>
+                    <span>MOBILE READY • SCAN VIA PROMOTIONAL FLYERS</span>
+                </div>
+
+                <h2 style="font-size: clamp(2rem, 5vw, 3.2rem); font-weight: 900; margin-bottom: 16px;">
+                    Start Your Workout Today.<br>
+                    <span class="text-gradient-cyan">Single Session.</span> <span class="text-gradient-orange">Total Power.</span>
+                </h2>
+
+                <p style="color: #cbd5e1; font-size: 15px; max-width: 600px; margin: 0 auto 35px auto; line-height: 1.6;">
+                    Whether you are scanning from a gym flyer or accessing from mobile, launch FITUP instantly in your browser or download the Android package.
+                </p>
+
+                <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 16px; margin-bottom: 30px;">
+                    <!-- Web App Link -->
+                    <a href="./index.html" class="btn-primary" style="padding: 16px 36px; font-size: 16px;">
+                        <i class="fa-solid fa-bolt"></i> Launch Web Application
+                    </a>
+
+                    <!-- Google Play Download Button -->
+                    <a href="./index.html#download" class="btn-secondary" style="padding: 16px 32px; font-size: 16px; background: rgba(0,0,0,0.6);">
+                        <i class="fa-brands fa-google-play" style="color: #38bdf8;"></i> Get it on Google Play
+                    </a>
+                </div>
+
+                <div style="font-size: 12px; color: var(--text-muted); display: flex; align-items: center; justify-content: center; gap: 20px; flex-wrap: wrap;">
+                    <span><i class="fa-solid fa-check text-emerald" style="color: var(--emerald);"></i> Instant Razorpay & UPI Payments</span>
+                    <span><i class="fa-solid fa-check text-emerald" style="color: var(--emerald);"></i> Zero Storage Footprint</span>
+                    <span><i class="fa-solid fa-check text-emerald" style="color: var(--emerald);"></i> Google Play Store Ready</span>
+                </div>
+
+            </div>
+        </div>
+    </section>
+
+    <!-- FOOTER WITH SPECIFIC T&C APPLY NOTICE -->
+    <footer>
+        <div class="max-w-container">
+            <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 24px;">
+                
+                <a href="#" class="brand-logo">
+                    <div class="logo-box">
+                        <img src="assets/fitup-logo.png" alt="FITUP">
+                    </div>
+                    <div>
+                        <div class="logo-text">FIT<span>UP</span></div>
+                        <div style="font-size: 9px; color: var(--orange); font-weight: 700; letter-spacing: 0.2em;">BOOK. LIFT. REPEAT.</div>
+                    </div>
+                </a>
+
+                <!-- Legal Policy Links -->
+                <div style="display: flex; flex-wrap: wrap; gap: 20px; font-size: 12px;">
+                    <a href="./index.html" class="nav-link">Privacy Policy</a>
+                    <a href="./index.html" class="nav-link">Terms of Service</a>
+                    <a href="./index.html" class="nav-link">Cancellation & Refunds</a>
+                    <a href="./index.html" class="nav-link">Delete Account</a>
+                </div>
+
+            </div>
+
+            <!-- Footer Bottom Row with Subdued 'T&C apply' at bottom right -->
+            <div class="footer-bottom">
+                <div>
+                    © 2026 FITUP Fitness Technologies Private Limited. All rights reserved. • Contact: +91 9030118909
+                </div>
+
+                <!-- REQUIRED SUBTLE NOTICE AT BOTTOM RIGHT -->
+                <div class="tc-apply-notice">
+                    *T&C apply
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- INTERACTIVE HTML5 CANVAS PARTICLE / CONSTELLATION SCRIPT -->
+    <script>
+        (function() {
+            const canvas = document.getElementById('galaxyCanvas');
+            const ctx = canvas.getContext('2d');
+            let width, height;
+            let particles = [];
+            
+            // Interaction tracking (Mouse & Multi-Touch)
+            const mouse = {
+                x: null,
+                y: null,
+                radius: 140,
+                isDown: false
+            };
+
+            // Color Palette (FITUP Cyan, Electric Orange, White Starlight)
+            const colors = [
+                '#00f0ff', // Cyan
+                '#00a2ff', // Blue
+                '#ff5500', // Orange
+                '#ffffff', // White Star
+                '#38bdf8'  // Light Sky
+            ];
+
+            function resize() {
+                const rect = canvas.parentElement.getBoundingClientRect();
+                width = canvas.width = rect.width;
+                height = canvas.height = rect.height;
+                initParticles();
+            }
+
+            class Particle {
+                constructor() {
+                    this.reset(true);
+                }
+
+                reset(initial = false) {
+                    this.x = initial ? Math.random() * width : (Math.random() < 0.5 ? 0 : width);
+                    this.y = Math.random() * height;
+                    this.size = Math.random() * 2.6 + 0.8;
+                    this.baseX = this.x;
+                    this.baseY = this.y;
+                    this.density = (Math.random() * 25) + 10;
+                    this.vx = (Math.random() - 0.5) * 0.7;
+                    this.vy = (Math.random() - 0.5) * 0.7;
+                    this.color = colors[Math.floor(Math.random() * colors.length)];
+                    this.alpha = Math.random() * 0.7 + 0.3;
+                    this.pulseSpeed = Math.random() * 0.02 + 0.01;
+                    this.pulseAngle = Math.random() * Math.PI * 2;
+                }
+
+                draw() {
+                    ctx.save();
+                    this.pulseAngle += this.pulseSpeed;
+                    const dynamicAlpha = this.alpha + Math.sin(this.pulseAngle) * 0.2;
+                    ctx.globalAlpha = Math.max(0.1, Math.min(1, dynamicAlpha));
+                    
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                    ctx.fillStyle = this.color;
+                    ctx.shadowBlur = this.size * 5;
+                    ctx.shadowColor = this.color;
+                    ctx.fill();
+                    ctx.restore();
+                }
+
+                update() {
+                    // Ambient drift
+                    this.x += this.vx;
+                    this.y += this.vy;
+
+                    // Wrap edges smoothly
+                    if (this.x < 0) this.x = width;
+                    if (this.x > width) this.x = 0;
+                    if (this.y < 0) this.y = height;
+                    if (this.y > height) this.y = 0;
+
+                    // Interactive touch/mouse physics (scattering & vortex)
+                    if (mouse.x !== null && mouse.y !== null) {
+                        const dx = mouse.x - this.x;
+                        const dy = mouse.y - this.y;
+                        const distance = Math.sqrt(dx * dx + dy * dy);
+
+                        if (distance < mouse.radius) {
+                            const forceDirectionX = dx / distance;
+                            const forceDirectionY = dy / distance;
+                            const maxDistance = mouse.radius;
+                            const force = (maxDistance - distance) / maxDistance;
+                            
+                            // Repulsive scatter
+                            const directionX = forceDirectionX * force * this.density;
+                            const directionY = forceDirectionY * force * this.density;
+                            
+                            this.x -= directionX * 0.6;
+                            this.y -= directionY * 0.6;
+                        }
+                    }
+                }
+            }
+
+            function initParticles() {
+                particles = [];
+                // Dynamic density based on screen size
+                const particleCount = Math.min(130, Math.floor((width * height) / 8000));
+                for (let i = 0; i < particleCount; i++) {
+                    particles.push(new Particle());
+                }
+            }
+
+            // Draw Constellation Lines between nearby particles
+            function connect() {
+                const maxDist = 110;
+                for (let a = 0; a < particles.length; a++) {
+                    for (let b = a + 1; b < particles.length; b++) {
+                        const dx = particles[a].x - particles[b].x;
+                        const dy = particles[a].y - particles[b].y;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+
+                        if (dist < maxDist) {
+                            const opacity = (1 - (dist / maxDist)) * 0.25;
+                            ctx.beginPath();
+                            ctx.strokeStyle = particles[a].color;
+                            ctx.globalAlpha = opacity;
+                            ctx.lineWidth = 0.8;
+                            ctx.moveTo(particles[a].x, particles[a].y);
+                            ctx.lineTo(particles[b].x, particles[b].y);
+                            ctx.stroke();
+                        }
+                    }
+                }
+
+                // Connect to touch/mouse point
+                if (mouse.x !== null && mouse.y !== null) {
+                    for (let i = 0; i < particles.length; i++) {
+                        const dx = mouse.x - particles[i].x;
+                        const dy = mouse.y - particles[i].y;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+
+                        if (dist < mouse.radius) {
+                            const opacity = (1 - (dist / mouse.radius)) * 0.45;
+                            ctx.beginPath();
+                            ctx.strokeStyle = '#00f0ff';
+                            ctx.globalAlpha = opacity;
+                            ctx.lineWidth = 1.2;
+                            ctx.moveTo(mouse.x, mouse.y);
+                            ctx.lineTo(particles[i].x, particles[i].y);
+                            ctx.stroke();
+                        }
+                    }
+                }
+            }
+
+            // Animation Loop (60 FPS)
+            function animate() {
+                ctx.clearRect(0, 0, width, height);
+
+                for (let i = 0; i < particles.length; i++) {
+                    particles[i].update();
+                    particles[i].draw();
+                }
+
+                connect();
+                requestAnimationFrame(animate);
+            }
+
+            // Touch & Mouse Event Listeners
+            window.addEventListener('resize', resize);
+
+            // Desktop Mouse
+            canvas.addEventListener('mousemove', (e) => {
+                const rect = canvas.getBoundingClientRect();
+                mouse.x = e.clientX - rect.left;
+                mouse.y = e.clientY - rect.top;
+            });
+
+            canvas.addEventListener('mouseleave', () => {
+                mouse.x = null;
+                mouse.y = null;
+            });
+
+            // Mobile Touch Support
+            canvas.addEventListener('touchstart', (e) => {
+                const rect = canvas.getBoundingClientRect();
+                const touch = e.touches[0];
+                mouse.x = touch.clientX - rect.left;
+                mouse.y = touch.clientY - rect.top;
+            }, { passive: true });
+
+            canvas.addEventListener('touchmove', (e) => {
+                const rect = canvas.getBoundingClientRect();
+                const touch = e.touches[0];
+                mouse.x = touch.clientX - rect.left;
+                mouse.y = touch.clientY - rect.top;
+            }, { passive: true });
+
+            canvas.addEventListener('touchend', () => {
+                // Smooth fade out of touch point
+                setTimeout(() => {
+                    mouse.x = null;
+                    mouse.y = null;
+                }, 400);
+            });
+
+            // Initialize
+            resize();
+            animate();
+        })();
+    </script>
+</body>
+</html>
