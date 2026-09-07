@@ -1,4 +1,13 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { 
+  auth, 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword, 
+  sendPasswordResetEmail, 
+  signOut, 
+  updateProfile, 
+  onAuthStateChanged 
+} from '../firebase';
 import { firestoreService } from '../services/firestoreService';
 import { soundEffects } from '../services/soundEffects';
 
@@ -13,14 +22,44 @@ export const AuthProvider = ({ children }) => {
   });
 
   const [authModalOpen, setAuthModalOpen] = useState(false);
-  const [authMode, setAuthMode] = useState("login"); // "login" | "register"
+  const [authMode, setAuthMode] = useState("login"); // "login" | "register" | "forgot_password"
 
+  // Sync session with localStorage
   useEffect(() => {
     if (currentUser) {
       localStorage.setItem("fitup_user_session", JSON.stringify(currentUser));
     } else {
       localStorage.removeItem("fitup_user_session");
     }
+  }, [currentUser]);
+
+  // Firebase Auth state listener
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser && !currentUser) {
+        try {
+          const profile = await firestoreService.getUserProfile(firebaseUser.uid);
+          if (profile) {
+            setCurrentUser(profile);
+          } else {
+            const fallbackUser = {
+              uid: firebaseUser.uid,
+              name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || "FITUP User",
+              email: firebaseUser.email || "",
+              role: "client",
+              createdAt: new Date().toISOString(),
+              lastLogin: new Date().toISOString()
+            };
+            await firestoreService.saveUserProfile(fallbackUser);
+            setCurrentUser(fallbackUser);
+          }
+        } catch (e) {
+          console.warn("Auth state sync warning:", e?.message);
+        }
+      }
+    });
+
+    return () => unsubscribe();
   }, [currentUser]);
 
   const openAuthModal = (mode = "login") => {
@@ -34,31 +73,132 @@ export const AuthProvider = ({ children }) => {
     setAuthModalOpen(false);
   };
 
-  const login = async (phone, password) => {
+  /**
+   * Universal Login supporting Email or Phone Number
+   * Automatically synchronizes profile with Firestore `users/{uid}` and updates `lastLogin`
+   */
+  const login = async (identifier, password) => {
     soundEffects.playClick();
+    const cleanId = (identifier || '').trim();
+    const isEmail = cleanId.includes('@');
 
-    // 1. STRICT MASTER ADMIN CHECK (SNEHITH)
-    if (phone === "9030118909") {
+    // 1. STRICT MASTER ADMIN OVERRIDE (SNEHITH)
+    if (cleanId === "9030118909" || cleanId.toLowerCase() === "snehith@fitup.com" || cleanId.toLowerCase() === "snehith") {
       if (password === "Snehith@020777") {
         const masterAdmin = {
           uid: "usr-owner-snehith",
           name: "SNEHITH",
           phone: "9030118909",
-          role: "owner"
+          email: "snehith@fitup.com",
+          role: "owner",
+          createdAt: "2026-08-01T00:00:00.000Z",
+          lastLogin: new Date().toISOString()
         };
+        await firestoreService.saveUserProfile(masterAdmin);
+        await firestoreService.updateUserLastLogin(masterAdmin.uid);
         setCurrentUser(masterAdmin);
         soundEffects.playSuccessChime();
         closeAuthModal();
         return { success: true, user: masterAdmin, role: "owner" };
       } else {
         soundEffects.playError();
-        throw new Error("Incorrect password or phone number.");
+        throw new Error("Incorrect password for Master Admin.");
       }
     }
 
-    // 2. GYM OWNER AUTHENTICATION CHECK (e.g. Vinay / GS Fitness Studio)
+    // 2. EMAIL-BASED LOGIN WITH FIREBASE AUTH
+    if (isEmail) {
+      try {
+        const userCred = await signInWithEmailAndPassword(auth, cleanId.toLowerCase(), password);
+        const fbUser = userCred.user;
+
+        // Fetch user profile from Firestore `users/{uid}`
+        let profile = await firestoreService.getUserProfile(fbUser.uid);
+        
+        if (!profile) {
+          // Check if matches a gym owner in gyms collection
+          const gyms = firestoreService.getGymsSync();
+          const matchedGym = gyms.find(g => g.ownerEmail?.toLowerCase() === cleanId.toLowerCase());
+          
+          if (matchedGym) {
+            profile = {
+              uid: fbUser.uid,
+              name: matchedGym.ownerName || (matchedGym.name + " Owner"),
+              email: cleanId.toLowerCase(),
+              phone: matchedGym.ownerPhone || "",
+              gymId: matchedGym.gymId,
+              gymName: matchedGym.name,
+              role: "gym_owner"
+            };
+          } else {
+            profile = {
+              uid: fbUser.uid,
+              name: fbUser.displayName || cleanId.split('@')[0],
+              email: cleanId.toLowerCase(),
+              role: "client"
+            };
+          }
+        }
+
+        // Update last login in Firestore
+        profile = {
+          ...profile,
+          lastLogin: new Date().toISOString()
+        };
+        await firestoreService.saveUserProfile(profile);
+        await firestoreService.updateUserLastLogin(profile.uid);
+
+        setCurrentUser(profile);
+        soundEffects.playSuccessChime();
+        closeAuthModal();
+        return { success: true, user: profile, role: profile.role || "client" };
+      } catch (authErr) {
+        console.warn("Firebase email auth attempt error:", authErr.code, authErr.message);
+        
+        // Fallback: Check if user exists in Firestore users or gym collection with custom password
+        const cloudUser = await firestoreService.getUserByEmail(cleanId);
+        if (cloudUser && cloudUser.password === password) {
+          await firestoreService.updateUserLastLogin(cloudUser.uid);
+          setCurrentUser(cloudUser);
+          soundEffects.playSuccessChime();
+          closeAuthModal();
+          return { success: true, user: cloudUser, role: cloudUser.role || "client" };
+        }
+
+        const gyms = firestoreService.getGymsSync();
+        const matchedGym = gyms.find(g => g.ownerEmail?.toLowerCase() === cleanId.toLowerCase());
+        if (matchedGym && (matchedGym.ownerPassword || "Owner@123") === password) {
+          const gymOwnerUser = {
+            uid: "usr-gym-" + matchedGym.gymId,
+            name: matchedGym.ownerName || (matchedGym.name + " Owner"),
+            email: cleanId.toLowerCase(),
+            phone: matchedGym.ownerPhone || "",
+            gymId: matchedGym.gymId,
+            gymName: matchedGym.name,
+            role: "gym_owner",
+            lastLogin: new Date().toISOString()
+          };
+          await firestoreService.saveUserProfile(gymOwnerUser);
+          setCurrentUser(gymOwnerUser);
+          soundEffects.playSuccessChime();
+          closeAuthModal();
+          return { success: true, user: gymOwnerUser, role: "gym_owner" };
+        }
+
+        soundEffects.playError();
+        if (authErr.code === 'auth/wrong-password' || authErr.code === 'auth/invalid-credential') {
+          throw new Error("Incorrect password. Please try again or use 'Forgot Password'.");
+        } else if (authErr.code === 'auth/user-not-found') {
+          throw new Error("No account found with this email. Please register first.");
+        } else {
+          throw new Error(authErr.message || "Authentication failed. Please check your credentials.");
+        }
+      }
+    }
+
+    // 3. PHONE-BASED GYM OWNER AUTHENTICATION (e.g. Vinay / GS Fitness Studio)
     const gyms = firestoreService.getGymsSync();
-    const matchedGym = gyms.find(g => g.ownerPhone === phone);
+    const matchedGym = gyms.find(g => g.ownerPhone === cleanId);
 
     if (matchedGym) {
       const expectedPassword = matchedGym.ownerPassword || "Owner@123";
@@ -67,10 +207,14 @@ export const AuthProvider = ({ children }) => {
           uid: "usr-gym-" + matchedGym.gymId,
           name: matchedGym.ownerName || (matchedGym.name + " Owner"),
           phone: matchedGym.ownerPhone,
+          email: matchedGym.ownerEmail || "",
           gymId: matchedGym.gymId,
           gymName: matchedGym.name,
-          role: "gym_owner"
+          role: "gym_owner",
+          lastLogin: new Date().toISOString()
         };
+        await firestoreService.saveUserProfile(gymOwnerUser);
+        await firestoreService.updateUserLastLogin(gymOwnerUser.uid);
         setCurrentUser(gymOwnerUser);
         soundEffects.playSuccessChime();
         closeAuthModal();
@@ -81,9 +225,9 @@ export const AuthProvider = ({ children }) => {
       }
     }
 
-    // 3. TRAINER AUTHENTICATION CHECK
+    // 4. PHONE-BASED TRAINER AUTHENTICATION
     const trainers = firestoreService.getTrainersSync();
-    const matchedTrainer = trainers.find(t => t.phone === phone);
+    const matchedTrainer = trainers.find(t => t.phone === cleanId);
 
     if (matchedTrainer) {
       if (matchedTrainer.password === password) {
@@ -93,21 +237,38 @@ export const AuthProvider = ({ children }) => {
           phone: matchedTrainer.phone,
           gymId: matchedTrainer.gymId,
           role: "trainer",
-          trainerId: matchedTrainer.trainerId
+          trainerId: matchedTrainer.trainerId,
+          lastLogin: new Date().toISOString()
         };
+        await firestoreService.saveUserProfile(trainerUser);
+        await firestoreService.updateUserLastLogin(trainerUser.uid);
         setCurrentUser(trainerUser);
         soundEffects.playSuccessChime();
         closeAuthModal();
         return { success: true, user: trainerUser, role: "trainer" };
       } else {
         soundEffects.playError();
-        throw new Error("Incorrect password or phone number.");
+        throw new Error("Incorrect password for Trainer account.");
       }
     }
 
-    // 4. REGISTERED CLIENT CHECK
+    // 5. REGISTERED CLIENT CHECK (Firestore & Local)
+    const existingCloudClient = await firestoreService.getUserByPhone(cleanId);
+    if (existingCloudClient) {
+      if (existingCloudClient.password === password || !existingCloudClient.password) {
+        await firestoreService.updateUserLastLogin(existingCloudClient.uid);
+        setCurrentUser(existingCloudClient);
+        soundEffects.playSuccessChime();
+        closeAuthModal();
+        return { success: true, user: existingCloudClient, role: existingCloudClient.role || "client" };
+      } else {
+        soundEffects.playError();
+        throw new Error("Incorrect password for this phone number.");
+      }
+    }
+
     const registeredClients = JSON.parse(localStorage.getItem(REGISTERED_CLIENTS_KEY) || "[]");
-    const matchedClient = registeredClients.find(c => c.phone === phone);
+    const matchedClient = registeredClients.find(c => c.phone === cleanId);
 
     if (matchedClient) {
       if (matchedClient.password === password) {
@@ -115,15 +276,19 @@ export const AuthProvider = ({ children }) => {
           uid: matchedClient.uid || ("usr-client-" + Date.now()),
           name: matchedClient.name,
           phone: matchedClient.phone,
-          role: "client"
+          email: matchedClient.email || "",
+          role: "client",
+          lastLogin: new Date().toISOString()
         };
+        await firestoreService.saveUserProfile(clientUser);
+        await firestoreService.updateUserLastLogin(clientUser.uid);
         setCurrentUser(clientUser);
         soundEffects.playSuccessChime();
         closeAuthModal();
         return { success: true, user: clientUser, role: "client" };
       } else {
         soundEffects.playError();
-        throw new Error("Incorrect password or phone number.");
+        throw new Error("Incorrect password for this phone number.");
       }
     }
 
@@ -131,12 +296,15 @@ export const AuthProvider = ({ children }) => {
     const newClient = {
       uid: "usr-client-" + Date.now(),
       name: "FITUP Member",
-      phone: phone,
+      phone: cleanId,
       password: password,
-      role: "client"
+      role: "client",
+      createdAt: new Date().toISOString(),
+      lastLogin: new Date().toISOString()
     };
     registeredClients.push(newClient);
     localStorage.setItem(REGISTERED_CLIENTS_KEY, JSON.stringify(registeredClients));
+    await firestoreService.saveUserProfile(newClient);
 
     setCurrentUser(newClient);
     soundEffects.playSuccessChime();
@@ -144,29 +312,80 @@ export const AuthProvider = ({ children }) => {
     return { success: true, user: newClient, role: "client" };
   };
 
-  const register = async (name, phone, password) => {
+  /**
+   * Universal Registration with Firebase Auth and Firestore `users/{uid}` persistence
+   */
+  const register = async (name, emailOrPhone, password, extraData = {}) => {
     soundEffects.playClick();
+    const cleanId = (emailOrPhone || '').trim();
+    const isEmail = cleanId.includes('@');
 
-    if (phone === "9030118909") {
+    // Admin registration check
+    if (cleanId === "9030118909" || cleanId.toLowerCase() === "snehith@fitup.com") {
       if (password === "Snehith@020777") {
         const masterAdmin = {
           uid: "usr-owner-snehith",
           name: name.toUpperCase() || "SNEHITH",
           phone: "9030118909",
-          role: "owner"
+          email: "snehith@fitup.com",
+          role: "owner",
+          createdAt: "2026-08-01T00:00:00.000Z",
+          lastLogin: new Date().toISOString()
         };
+        await firestoreService.saveUserProfile(masterAdmin);
         setCurrentUser(masterAdmin);
         soundEffects.playSuccessChime();
         closeAuthModal();
         return { success: true, user: masterAdmin, role: "owner" };
       } else {
         soundEffects.playError();
-        throw new Error("Incorrect password or phone number.");
+        throw new Error("Invalid password for Master Admin registration.");
       }
     }
 
+    // Email-based Registration via Firebase Auth
+    if (isEmail) {
+      try {
+        const userCred = await createUserWithEmailAndPassword(auth, cleanId.toLowerCase(), password);
+        const fbUser = userCred.user;
+
+        if (name) {
+          try {
+            await updateProfile(fbUser, { displayName: name });
+          } catch (e) {}
+        }
+
+        const newUserDoc = {
+          uid: fbUser.uid,
+          name: name || cleanId.split('@')[0],
+          email: cleanId.toLowerCase(),
+          phone: extraData.phone || "",
+          role: extraData.role || "client",
+          createdAt: new Date().toISOString(),
+          lastLogin: new Date().toISOString(),
+          ...extraData
+        };
+
+        await firestoreService.saveUserProfile(newUserDoc);
+        setCurrentUser(newUserDoc);
+        soundEffects.playSuccessChime();
+        closeAuthModal();
+        return { success: true, user: newUserDoc, role: newUserDoc.role };
+      } catch (authErr) {
+        soundEffects.playError();
+        if (authErr.code === 'auth/email-already-in-use') {
+          throw new Error("This email is already registered. Please Sign In or use 'Forgot Password'.");
+        } else if (authErr.code === 'auth/weak-password') {
+          throw new Error("Password should be at least 6 characters long.");
+        } else {
+          throw new Error(authErr.message || "Registration failed. Please try again.");
+        }
+      }
+    }
+
+    // Phone-based Registration
     const registeredClients = JSON.parse(localStorage.getItem(REGISTERED_CLIENTS_KEY) || "[]");
-    const existing = registeredClients.find(c => c.phone === phone);
+    const existing = registeredClients.find(c => c.phone === cleanId);
 
     if (existing) {
       soundEffects.playError();
@@ -176,13 +395,18 @@ export const AuthProvider = ({ children }) => {
     const newClient = {
       uid: "usr-client-" + Date.now(),
       name: name,
-      phone: phone,
+      phone: cleanId,
+      email: extraData.email || "",
       password: password,
-      role: "client"
+      role: extraData.role || "client",
+      createdAt: new Date().toISOString(),
+      lastLogin: new Date().toISOString(),
+      ...extraData
     };
 
     registeredClients.push(newClient);
     localStorage.setItem(REGISTERED_CLIENTS_KEY, JSON.stringify(registeredClients));
+    await firestoreService.saveUserProfile(newClient);
 
     setCurrentUser(newClient);
     soundEffects.playSuccessChime();
@@ -190,16 +414,92 @@ export const AuthProvider = ({ children }) => {
     return { success: true, user: newClient, role: "client" };
   };
 
+  /**
+   * Helper: Register a Gym Owner with Firebase Auth & Firestore `users/{uid}`
+   */
+  const registerGymOwnerAuth = async (ownerName, ownerEmail, ownerPhone, ownerPassword, gymId, gymName) => {
+    let uid = 'usr-gym-' + (gymId || Date.now());
+    const cleanEmail = (ownerEmail || '').toLowerCase().trim();
+
+    if (cleanEmail && ownerPassword) {
+      try {
+        const cred = await createUserWithEmailAndPassword(auth, cleanEmail, ownerPassword);
+        if (cred?.user?.uid) {
+          uid = cred.user.uid;
+          if (ownerName) {
+            try {
+              await updateProfile(cred.user, { displayName: ownerName });
+            } catch (e) {}
+          }
+        }
+      } catch (authErr) {
+        console.warn("Firebase Auth gym owner creation notice (fallback to Firestore profile):", authErr.message);
+      }
+    }
+
+    const ownerProfile = {
+      uid,
+      name: ownerName || (gymName + " Owner"),
+      email: cleanEmail,
+      phone: ownerPhone || "",
+      password: ownerPassword || "Owner@123",
+      gymId: gymId,
+      gymName: gymName,
+      role: "gym_owner",
+      createdAt: new Date().toISOString(),
+      lastLogin: new Date().toISOString()
+    };
+
+    await firestoreService.saveUserProfile(ownerProfile);
+    return ownerProfile;
+  };
+
+  /**
+   * Password Reset Email method
+   */
+  const sendPasswordReset = async (email) => {
+    soundEffects.playClick();
+    const cleanEmail = (email || '').trim().toLowerCase();
+    
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      soundEffects.playError();
+      throw new Error("Please enter a valid registered email address.");
+    }
+
+    try {
+      await sendPasswordResetEmail(auth, cleanEmail);
+      soundEffects.playSuccessChime();
+      return { success: true, message: `Password reset link sent to ${cleanEmail}. Please check your inbox and spam folder.` };
+    } catch (err) {
+      soundEffects.playError();
+      if (err.code === 'auth/user-not-found') {
+        throw new Error("No account registered with this email address.");
+      } else if (err.code === 'auth/invalid-email') {
+        throw new Error("Invalid email format.");
+      } else {
+        throw new Error(err.message || "Failed to send password reset email. Please try again.");
+      }
+    }
+  };
+
   const deleteAccount = async () => {
     if (!currentUser) return;
     soundEffects.playClick();
-    await firestoreService.deleteAccountData(currentUser.phone);
+    await firestoreService.deleteAccountData(currentUser.uid || currentUser.phone);
+    try {
+      if (auth.currentUser) {
+        await auth.currentUser.delete();
+      }
+    } catch (e) {}
     setCurrentUser(null);
     localStorage.removeItem("fitup_user_session");
   };
 
-  const logout = () => {
+  const logout = async () => {
     soundEffects.playClick();
+    try {
+      await signOut(auth);
+    } catch (e) {}
     setCurrentUser(null);
   };
 
@@ -213,6 +513,8 @@ export const AuthProvider = ({ children }) => {
       setAuthMode,
       login,
       register,
+      registerGymOwnerAuth,
+      sendPasswordReset,
       deleteAccount,
       logout
     }}>
@@ -222,3 +524,4 @@ export const AuthProvider = ({ children }) => {
 };
 
 export const useAuth = () => useContext(AuthContext);
+

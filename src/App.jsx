@@ -20,7 +20,7 @@ const MainContent = () => {
     if (saved) {
       try {
         const u = JSON.parse(saved);
-        if (u?.phone === '9030118909' && u?.role === 'owner') return 'owner_dash';
+        if ((u?.phone === '9030118909' || u?.email === 'snehith@fitup.com' || u?.uid === 'usr-owner-snehith') && u?.role === 'owner') return 'owner_dash';
         if (u?.role === 'gym_owner') return 'gym_owner_dash';
         if (u?.role === 'trainer') return 'trainer_dash';
       } catch (e) {}
@@ -45,10 +45,14 @@ const MainContent = () => {
 
   // Keep active tab in sync if user changes role or logs out
   useEffect(() => {
-    if (activeTab === 'owner_dash' && (currentUser?.phone !== '9030118909' || currentUser?.role !== 'owner')) {
+    const isOwner = (currentUser?.phone === '9030118909' || currentUser?.email === 'snehith@fitup.com' || currentUser?.uid === 'usr-owner-snehith') && currentUser?.role === 'owner';
+    if (activeTab === 'owner_dash' && !isOwner) {
       setActiveTab('home');
     }
     if (activeTab === 'gym_owner_dash' && currentUser?.role !== 'gym_owner') {
+      setActiveTab('home');
+    }
+    if (activeTab === 'trainer_dash' && currentUser?.role !== 'trainer') {
       setActiveTab('home');
     }
   }, [currentUser, activeTab]);

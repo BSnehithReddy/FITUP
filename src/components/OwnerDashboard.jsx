@@ -36,7 +36,7 @@ const AVAILABLE_SLOT_OPTIONS = [
 ];
 
 export const OwnerDashboard = ({ setActiveTab }) => {
-  const { currentUser } = useAuth();
+  const { currentUser, registerGymOwnerAuth } = useAuth();
   
   // Strict Master Admin Check (Phone: 9030118909 & role: owner)
   const isMasterAdmin = currentUser?.phone === "9030118909" && currentUser?.role === "owner";
@@ -102,6 +102,7 @@ export const OwnerDashboard = ({ setActiveTab }) => {
     amenities: ['AC', 'Free Locker'],
     ownerName: 'Vinay',
     ownerPhone: '9123456780',
+    ownerEmail: 'vinay@gsfitness.com',
     ownerPassword: 'Owner@123',
     gymSplitPercent: 30
   });
@@ -242,6 +243,7 @@ export const OwnerDashboard = ({ setActiveTab }) => {
         amenities: gym?.amenities || ['AC', 'Free Locker'],
         ownerName: gym?.ownerName || 'Vinay',
         ownerPhone: gym?.ownerPhone || '9123456780',
+        ownerEmail: gym?.ownerEmail || 'vinay@gsfitness.com',
         ownerPassword: gym?.ownerPassword || 'Owner@123',
         gymSplitPercent: gym?.gymSplitPercent !== undefined ? gym.gymSplitPercent : 30
       });
@@ -256,6 +258,7 @@ export const OwnerDashboard = ({ setActiveTab }) => {
         amenities: ['AC', 'Free Locker', 'Steam Bath'],
         ownerName: '',
         ownerPhone: '',
+        ownerEmail: '',
         ownerPassword: 'Owner@123',
         gymSplitPercent: 30
       });
@@ -271,7 +274,7 @@ export const OwnerDashboard = ({ setActiveTab }) => {
       return;
     }
 
-    await firestoreService.saveGym({
+    const savedGym = await firestoreService.saveGym({
       ...gymForm,
       gymId: editingGym ? editingGym.gymId : null,
       rating: editingGym?.rating || 4.9,
@@ -281,8 +284,24 @@ export const OwnerDashboard = ({ setActiveTab }) => {
       ownerQrCodeUrl: ownerConfig?.ownerQrCodeUrl || ''
     }, currentUser);
 
+    // Sync Gym Owner Account to Firebase Auth & Firestore `users/{uid}`
+    if (registerGymOwnerAuth && (gymForm.ownerEmail || gymForm.ownerPassword || gymForm.ownerPhone)) {
+      try {
+        await registerGymOwnerAuth(
+          gymForm.ownerName,
+          gymForm.ownerEmail,
+          gymForm.ownerPhone,
+          gymForm.ownerPassword,
+          savedGym.gymId,
+          savedGym.name
+        );
+      } catch (authErr) {
+        console.warn("Gym owner auth sync notice:", authErr?.message);
+      }
+    }
+
     setShowGymModal(false);
-    showToast(editingGym ? "Gym & 30% Split Settings Updated!" : "New Partner Gym Added!");
+    showToast(editingGym ? "Gym & 30% Split Settings Updated!" : "New Partner Gym & Owner Account Added!");
   };
 
   const handleDeleteGym = async (gymId) => {
@@ -848,28 +867,51 @@ export const OwnerDashboard = ({ setActiveTab }) => {
               </div>
 
               {/* Gym Owner Account Credentials */}
-              <div className="grid grid-cols-2 gap-3 p-3 rounded-2xl bg-slate-950 border border-white/10">
-                <div className="col-span-2 text-electricBlue font-bold font-mono text-[11px] flex items-center gap-1">
-                  <Building2 className="w-3.5 h-3.5" /> Gym Owner Login Details (e.g. Vinay)
+              <div className="grid grid-cols-2 gap-3 p-3.5 rounded-2xl bg-slate-950 border border-emerald-500/20 shadow-[0_0_20px_rgba(52,211,153,0.05)]">
+                <div className="col-span-2 text-emerald-400 font-bold font-mono text-[11px] flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Building2 className="w-3.5 h-3.5" /> Gym Owner Auth & Login Credentials
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-normal">Firestore & Firebase Auth Synced</span>
                 </div>
                 <div>
-                  <label className="text-slate-400 block mb-1">Owner Name</label>
+                  <label className="text-slate-400 block mb-1 text-xs">Owner Name</label>
                   <input
                     type="text"
                     value={gymForm.ownerName}
                     onChange={(e) => setGymForm({ ...gymForm, ownerName: e.target.value })}
                     placeholder="e.g. Vinay"
-                    className="w-full bg-slate-900 border border-white/10 rounded-lg px-3 py-2 text-white text-xs"
+                    className="w-full bg-slate-900 border border-white/10 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-emerald-400"
                   />
                 </div>
                 <div>
-                  <label className="text-slate-400 block mb-1">Owner Phone (Login ID)</label>
+                  <label className="text-slate-400 block mb-1 text-xs">Owner Phone (Login ID)</label>
                   <input
                     type="tel"
                     value={gymForm.ownerPhone}
                     onChange={(e) => setGymForm({ ...gymForm, ownerPhone: e.target.value })}
                     placeholder="e.g. 9123456780"
-                    className="w-full bg-slate-900 border border-white/10 rounded-lg px-3 py-2 text-white text-xs font-mono"
+                    className="w-full bg-slate-900 border border-white/10 rounded-lg px-3 py-2 text-white text-xs font-mono focus:outline-none focus:border-emerald-400"
+                  />
+                </div>
+                <div>
+                  <label className="text-slate-400 block mb-1 text-xs">Owner Email (Firebase Auth)</label>
+                  <input
+                    type="email"
+                    value={gymForm.ownerEmail}
+                    onChange={(e) => setGymForm({ ...gymForm, ownerEmail: e.target.value })}
+                    placeholder="e.g. vinay@gsfitness.com"
+                    className="w-full bg-slate-900 border border-white/10 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-emerald-400"
+                  />
+                </div>
+                <div>
+                  <label className="text-slate-400 block mb-1 text-xs">Custom Owner Password</label>
+                  <input
+                    type="text"
+                    value={gymForm.ownerPassword}
+                    onChange={(e) => setGymForm({ ...gymForm, ownerPassword: e.target.value })}
+                    placeholder="e.g. Owner@123"
+                    className="w-full bg-slate-900 border border-white/10 rounded-lg px-3 py-2 text-white text-xs font-mono focus:outline-none focus:border-emerald-400"
                   />
                 </div>
               </div>

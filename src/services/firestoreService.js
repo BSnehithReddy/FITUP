@@ -6,8 +6,10 @@ import {
     getDoc, 
     setDoc, 
     updateDoc, 
-    deleteDoc,
-    onSnapshot 
+    deleteDoc, 
+    onSnapshot, 
+    query, 
+    where 
 } from "../firebase";
 
 const emitDataSync = () => {
@@ -184,7 +186,18 @@ const INITIAL_DATA = {
             date: "2026-08-30"
         }
     ],
-    payoutRequests: []
+    payoutRequests: [],
+    users: [
+        {
+            uid: "usr-owner-snehith",
+            name: "SNEHITH",
+            phone: "9030118909",
+            email: "snehith@fitup.com",
+            role: "owner",
+            createdAt: "2026-08-01T00:00:00.000Z",
+            lastLogin: new Date().toISOString()
+        }
+    ]
 };
 
 const STORAGE_KEYS = {
@@ -194,7 +207,8 @@ const STORAGE_KEYS = {
     BOOKINGS: "fitup_bookings",
     REVIEWS: "fitup_reviews",
     PAYOUT_REQUESTS: "fitup_payout_requests",
-    REGISTERED_CLIENTS: "fitup_registered_clients"
+    REGISTERED_CLIENTS: "fitup_registered_clients",
+    USERS: "fitup_users"
 };
 
 const safeJsonParse = (key, fallback) => {
@@ -226,6 +240,9 @@ const initLocalStore = () => {
     }
     if (!localStorage.getItem(STORAGE_KEYS.PAYOUT_REQUESTS)) {
         localStorage.setItem(STORAGE_KEYS.PAYOUT_REQUESTS, JSON.stringify(INITIAL_DATA.payoutRequests));
+    }
+    if (!localStorage.getItem(STORAGE_KEYS.USERS)) {
+        localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(INITIAL_DATA.users));
     }
 };
 
@@ -339,6 +356,25 @@ export const firestoreService = {
                     if (firestoreRequests.length > 0) {
                         localStorage.setItem(STORAGE_KEYS.PAYOUT_REQUESTS, JSON.stringify(firestoreRequests));
                         callback(firestoreRequests);
+                    }
+                }
+            }, () => {});
+            return unsub;
+        } catch (e) {
+            return () => {};
+        }
+    },
+
+    subscribeUsers(callback) {
+        callback(this.getUsersSync());
+        try {
+            const unsub = onSnapshot(collection(db, "users"), (snapshot) => {
+                if (snapshot && !snapshot.empty) {
+                    const firestoreUsers = [];
+                    snapshot.forEach(doc => firestoreUsers.push({ ...doc.data(), uid: doc.id }));
+                    if (firestoreUsers.length > 0) {
+                        localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(firestoreUsers));
+                        callback(firestoreUsers);
                     }
                 }
             }, () => {});
@@ -786,25 +822,166 @@ export const firestoreService = {
     },
 
     // ----------------------------------------------------
+    // USER PROFILES & FIRESTORE SYNC (users/{uid})
+    // ----------------------------------------------------
+    getUsersSync() {
+        const res = safeJsonParse(STORAGE_KEYS.USERS, INITIAL_DATA.users);
+        return Array.isArray(res) ? res : INITIAL_DATA.users;
+    },
+
+    async getUsers() {
+        return this.getUsersSync();
+    },
+
+    async getUserProfile(uid) {
+        if (!uid) return null;
+        const users = this.getUsersSync();
+        const localUser = users.find(u => u.uid === uid);
+
+        try {
+            const snap = await getDoc(doc(db, "users", uid));
+            if (snap && snap.exists && snap.exists()) {
+                const cloudUser = { ...snap.data(), uid: snap.id };
+                // Cache locally
+                const idx = users.findIndex(u => u.uid === uid);
+                if (idx !== -1) users[idx] = cloudUser;
+                else users.push(cloudUser);
+                localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
+                return cloudUser;
+            }
+        } catch (e) {
+            console.warn("Firestore getUserProfile fallback to cache:", e?.message);
+        }
+
+        return localUser || null;
+    },
+
+    async getUserByEmail(email) {
+        if (!email) return null;
+        const normalized = email.toLowerCase().trim();
+        const users = this.getUsersSync();
+        const localUser = users.find(u => u.email && u.email.toLowerCase().trim() === normalized);
+        if (localUser) return localUser;
+
+        try {
+            const q = query(collection(db, "users"), where("email", "==", normalized));
+            const snap = await getDocs(q);
+            if (snap && !snap.empty) {
+                const cloudUser = { ...snap.docs[0].data(), uid: snap.docs[0].id };
+                users.push(cloudUser);
+                localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
+                return cloudUser;
+            }
+        } catch (e) {}
+
+        return null;
+    },
+
+    async getUserByPhone(phone) {
+        if (!phone) return null;
+        const cleanPhone = phone.trim();
+        const users = this.getUsersSync();
+        const localUser = users.find(u => u.phone && u.phone.trim() === cleanPhone);
+        if (localUser) return localUser;
+
+        try {
+            const q = query(collection(db, "users"), where("phone", "==", cleanPhone));
+            const snap = await getDocs(q);
+            if (snap && !snap.empty) {
+                const cloudUser = { ...snap.docs[0].data(), uid: snap.docs[0].id };
+                users.push(cloudUser);
+                localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
+                return cloudUser;
+            }
+        } catch (e) {}
+
+        return null;
+    },
+
+    async saveUserProfile(userData) {
+        if (!userData || !userData.uid) return null;
+        const cleanData = {
+            ...userData,
+            email: (userData.email || "").toLowerCase().trim(),
+            updatedAt: new Date().toISOString()
+        };
+        if (!cleanData.createdAt) {
+            cleanData.createdAt = new Date().toISOString();
+        }
+
+        const users = this.getUsersSync();
+        const idx = users.findIndex(u => u.uid === cleanData.uid);
+        if (idx !== -1) {
+            users[idx] = { ...users[idx], ...cleanData };
+        } else {
+            users.push(cleanData);
+        }
+        localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
+        emitDataSync();
+
+        try {
+            await setDoc(doc(db, "users", cleanData.uid), cleanData, { merge: true });
+        } catch (e) {
+            console.warn("Firestore saveUserProfile error (saved locally):", e?.message);
+        }
+
+        return cleanData;
+    },
+
+    async updateUserLastLogin(uid, metadata = {}) {
+        if (!uid) return null;
+        const lastLogin = new Date().toISOString();
+        const users = this.getUsersSync();
+        const idx = users.findIndex(u => u.uid === uid);
+        let updatedUser = null;
+
+        if (idx !== -1) {
+            users[idx] = { ...users[idx], ...metadata, lastLogin, updatedAt: lastLogin };
+            updatedUser = users[idx];
+            localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
+        }
+
+        emitDataSync();
+
+        try {
+            await setDoc(doc(db, "users", uid), { ...metadata, lastLogin, updatedAt: lastLogin }, { merge: true });
+        } catch (e) {
+            console.warn("Firestore updateUserLastLogin error:", e?.message);
+        }
+
+        return updatedUser;
+    },
+
+    // ----------------------------------------------------
     // ACCOUNT DELETION (Google Play Policy Compliance)
     // ----------------------------------------------------
-    async deleteAccountData(phone) {
+    async deleteAccountData(phoneOrUid) {
         // 1. Remove from registered clients
         let clients = safeJsonParse(STORAGE_KEYS.REGISTERED_CLIENTS, []);
-        clients = clients.filter(c => c.phone !== phone);
+        clients = clients.filter(c => c.phone !== phoneOrUid && c.uid !== phoneOrUid);
         localStorage.setItem(STORAGE_KEYS.REGISTERED_CLIENTS, JSON.stringify(clients));
 
-        // 2. Anonymize past booking names
+        // 2. Remove from users collection
+        let users = this.getUsersSync().filter(u => u.phone !== phoneOrUid && u.uid !== phoneOrUid);
+        localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
+
+        // 3. Anonymize past booking names
         let bookings = this.getBookingsSync();
         bookings = bookings.map(b => {
-            if (b.userPhone === phone) {
-                return { ...b, userName: "Deleted User", userPhone: "DELETED" };
+            if (b.userPhone === phoneOrUid || b.userId === phoneOrUid) {
+                return { ...b, userName: "Deleted User", userPhone: "DELETED", userId: "DELETED" };
             }
             return b;
         });
         localStorage.setItem(STORAGE_KEYS.BOOKINGS, JSON.stringify(bookings));
 
         emitDataSync();
+
+        try {
+            await deleteDoc(doc(db, "users", phoneOrUid));
+        } catch (e) {}
+
         return { success: true };
     }
 };
+

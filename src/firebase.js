@@ -1,5 +1,13 @@
 import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { 
+    getAuth, 
+    signInWithEmailAndPassword, 
+    createUserWithEmailAndPassword, 
+    sendPasswordResetEmail, 
+    signOut, 
+    updateProfile, 
+    onAuthStateChanged 
+} from "firebase/auth";
 import { getAnalytics, isSupported as isAnalyticsSupported } from "firebase/analytics";
 import { 
     getFirestore, 
@@ -13,7 +21,9 @@ import {
     deleteDoc, 
     onSnapshot, 
     query, 
-    orderBy 
+    where,
+    orderBy,
+    serverTimestamp 
 } from "firebase/firestore";
 
 // FITUP Firebase Configuration
@@ -53,6 +63,12 @@ export {
     app,
     db, 
     auth,
+    signInWithEmailAndPassword,
+    createUserWithEmailAndPassword,
+    sendPasswordResetEmail,
+    signOut,
+    updateProfile,
+    onAuthStateChanged,
     analytics,
     firebaseConfig,
     collection, 
@@ -65,5 +81,8 @@ export {
     deleteDoc, 
     onSnapshot, 
     query, 
-    orderBy 
+    where,
+    orderBy,
+    serverTimestamp 
 };
+

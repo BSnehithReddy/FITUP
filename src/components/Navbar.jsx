@@ -6,8 +6,8 @@ import { Dumbbell, Shield, User, LogOut, Ticket, LayoutDashboard, Search, Sparkl
 export const Navbar = ({ activeTab, setActiveTab }) => {
   const { currentUser, openAuthModal, logout } = useAuth();
 
-  // Strict Master Admin check (Phone: 9030118909 and role: owner)
-  const isMasterAdmin = currentUser?.phone === '9030118909' && currentUser?.role === 'owner';
+  // Strict Master Admin check (Phone: 9030118909 or email: snehith@fitup.com and role: owner)
+  const isMasterAdmin = (currentUser?.phone === '9030118909' || currentUser?.email === 'snehith@fitup.com' || currentUser?.uid === 'usr-owner-snehith') && currentUser?.role === 'owner';
   const isGymOwner = currentUser?.role === 'gym_owner';
 
   return (
