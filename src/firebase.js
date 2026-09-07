@@ -4,6 +4,9 @@ import {
     signInWithEmailAndPassword, 
     createUserWithEmailAndPassword, 
     sendPasswordResetEmail, 
+    signInWithPhoneNumber,
+    RecaptchaVerifier,
+    updatePassword,
     signOut, 
     updateProfile, 
     onAuthStateChanged 
@@ -66,6 +69,9 @@ export {
     signInWithEmailAndPassword,
     createUserWithEmailAndPassword,
     sendPasswordResetEmail,
+    signInWithPhoneNumber,
+    RecaptchaVerifier,
+    updatePassword,
     signOut,
     updateProfile,
     onAuthStateChanged,
@@ -85,4 +91,5 @@ export {
     orderBy,
     serverTimestamp 
 };
+
 

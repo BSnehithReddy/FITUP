@@ -952,6 +952,64 @@ export const firestoreService = {
         return updatedUser;
     },
 
+    async updateUserPasswordByPhone(phone, newPassword) {
+        if (!phone || !newPassword) throw new Error("Phone number and new password are required.");
+        const cleanPhone = phone.trim();
+        let matched = false;
+
+        // 1. Update in Firestore users collection & local store
+        const users = this.getUsersSync();
+        const userIdx = users.findIndex(u => u.phone === cleanPhone);
+        if (userIdx !== -1) {
+            users[userIdx].password = newPassword;
+            users[userIdx].updatedAt = new Date().toISOString();
+            localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
+            matched = true;
+            try {
+                await updateDoc(doc(db, "users", users[userIdx].uid), {
+                    password: newPassword,
+                    updatedAt: users[userIdx].updatedAt
+                });
+            } catch (e) {}
+        }
+
+        // 2. Update Gym Owner password if matches gym owner phone
+        const gyms = this.getGymsSync();
+        const gymIdx = gyms.findIndex(g => g.ownerPhone === cleanPhone);
+        if (gymIdx !== -1) {
+            gyms[gymIdx].ownerPassword = newPassword;
+            localStorage.setItem(STORAGE_KEYS.GYMS, JSON.stringify(gyms));
+            matched = true;
+            try {
+                await updateDoc(doc(db, "gyms", gyms[gymIdx].gymId), { ownerPassword: newPassword });
+            } catch (e) {}
+        }
+
+        // 3. Update Trainer password if matches trainer phone
+        const trainers = this.getTrainersSync();
+        const trIdx = trainers.findIndex(t => t.phone === cleanPhone);
+        if (trIdx !== -1) {
+            trainers[trIdx].password = newPassword;
+            localStorage.setItem(STORAGE_KEYS.TRAINERS, JSON.stringify(trainers));
+            matched = true;
+            try {
+                await updateDoc(doc(db, "trainers", trainers[trIdx].trainerId), { password: newPassword });
+            } catch (e) {}
+        }
+
+        // 4. Update Registered Clients local store
+        const clients = safeJsonParse(STORAGE_KEYS.REGISTERED_CLIENTS, []);
+        const cIdx = clients.findIndex(c => c.phone === cleanPhone);
+        if (cIdx !== -1) {
+            clients[cIdx].password = newPassword;
+            localStorage.setItem(STORAGE_KEYS.REGISTERED_CLIENTS, JSON.stringify(clients));
+            matched = true;
+        }
+
+        emitDataSync();
+        return { success: true, matched };
+    },
+
     // ----------------------------------------------------
     // ACCOUNT DELETION (Google Play Policy Compliance)
     // ----------------------------------------------------
@@ -984,4 +1042,5 @@ export const firestoreService = {
         return { success: true };
     }
 };
+
 
