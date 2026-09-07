@@ -21,7 +21,7 @@ const INITIAL_DATA = {
         ownerUpiId: "9030118909@ybl",
         ownerPhone: "9030118909",
         ownerQrCodeUrl: "https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=upi://pay?pa=9030118909@ybl&pn=FITUP%20Owner&am=280&cu=INR",
-        razorpayKeyId: "rzp_test_FITUPDemoKey",
+        razorpayKeyId: "rzp_test_TYwrtzZ7ROjR5s",
         defaultPlatformSplit: 20,
         defaultGymSplit: 30,
         defaultTrainerSplit: 50

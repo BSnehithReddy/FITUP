@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { firestoreService } from '../services/firestoreService';
 import { soundEffects } from '../services/soundEffects';
+import { razorpayService } from '../services/razorpayService';
 import { SafeImage } from './SafeImage';
 import { useAuth } from '../context/AuthContext';
 import { DeleteAccountModal } from "./DeleteAccountModal";
@@ -167,9 +168,8 @@ export const ClientDashboard = ({ activeTab = 'home', setActiveTab }) => {
 
     setIsProcessingRazorpay(true);
     const amountInRupees = selectedGym.startingPrice || 280;
-    const amountInPaise = amountInRupees * 100;
 
-    const executeBookingSuccess = async (paymentId) => {
+    const executeBookingSuccess = async ({ paymentId, orderId, signature }) => {
       soundEffects.playSuccessChime();
       const booking = await firestoreService.createBooking({
         userId: currentUser.uid,
@@ -184,8 +184,10 @@ export const ClientDashboard = ({ activeTab = 'home', setActiveTab }) => {
         date: new Date().toISOString().split('T')[0],
         amount: amountInRupees,
         paymentMethod: "RAZORPAY",
-        paymentId: paymentId,
-        txnId: paymentId
+        paymentId: paymentId || `pay_rzp_${Date.now()}`,
+        orderId: orderId || null,
+        signature: signature || null,
+        txnId: paymentId || `pay_rzp_${Date.now()}`
       });
 
       setIsProcessingRazorpay(false);
@@ -194,49 +196,23 @@ export const ClientDashboard = ({ activeTab = 'home', setActiveTab }) => {
       showToast("Payment Verified via Razorpay! Pass Generated.");
     };
 
-    // Check if Razorpay SDK script is loaded
-    if (window.Razorpay) {
-      const options = {
-        key: ownerConfig?.razorpayKeyId || "rzp_test_FITUPDemoKey",
-        amount: amountInPaise,
-        currency: "INR",
-        name: "FITUP Fitness",
-        description: `2-Hour PT Trial Pass • ${selectedGym.name}`,
-        image: "assets/fitup-logo.png",
-        handler: function (response) {
-          executeBookingSuccess(response.razorpay_payment_id || `pay_rzp_${Date.now()}`);
-        },
-        prefill: {
-          name: currentUser.name,
-          contact: currentUser.phone,
-          email: "member@fitup.app"
-        },
-        theme: {
-          color: "#00f0ff"
-        },
-        modal: {
-          ondismiss: function () {
-            setIsProcessingRazorpay(false);
-          }
-        }
-      };
-
-      try {
-        const rzp = new window.Razorpay(options);
-        rzp.open();
-      } catch (err) {
-        console.warn("Razorpay standard modal popup fallback:", err);
-        // Fallback simulation for offline testing environments
-        setTimeout(() => {
-          executeBookingSuccess(`pay_rzp_mock_${Math.floor(100000 + Math.random() * 900000)}`);
-        }, 1200);
+    razorpayService.openCheckout({
+      amount: amountInRupees,
+      gymName: selectedGym.name,
+      trainerName: selectedTrainer?.name || 'Assigned Master Coach',
+      user: currentUser,
+      onSuccess: (res) => {
+        executeBookingSuccess(res);
+      },
+      onFailure: (err) => {
+        setIsProcessingRazorpay(false);
+        soundEffects.playError();
+        showToast(err.message || "Payment cancelled or failed");
+      },
+      onDismiss: () => {
+        setIsProcessingRazorpay(false);
       }
-    } else {
-      // Instant gateway test verification fallback
-      setTimeout(() => {
-        executeBookingSuccess(`pay_rzp_test_${Math.floor(100000 + Math.random() * 900000)}`);
-      }, 1000);
-    }
+    });
   };
 
   const handleScreenshotUpload = (e) => {

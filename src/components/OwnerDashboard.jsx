@@ -78,7 +78,7 @@ export const OwnerDashboard = ({ setActiveTab }) => {
   const [ownerConfig, setOwnerConfig] = useState({ 
     ownerUpiId: '9030118909@ybl', 
     ownerQrCodeUrl: '', 
-    razorpayKeyId: 'rzp_test_FITUPDemoKey',
+    razorpayKeyId: localStorage.getItem('fitup_razorpay_key') || 'rzp_test_TYwrtzZ7ROjR5s',
     defaultPlatformSplit: 20,
     defaultGymSplit: 30,
     defaultTrainerSplit: 50
@@ -120,9 +120,9 @@ export const OwnerDashboard = ({ setActiveTab }) => {
   });
 
   const [upiForm, setUpiForm] = useState({
-    ownerUpiId: '9030118909@ybl',
+    ownerUpiId: localStorage.getItem('fitup_owner_upi') || '9030118909@ybl',
     ownerQrCodeUrl: '',
-    razorpayKeyId: 'rzp_test_FITUPDemoKey'
+    razorpayKeyId: localStorage.getItem('fitup_razorpay_key') || 'rzp_test_TYwrtzZ7ROjR5s'
   });
 
   const [toastMessage, setToastMessage] = useState(null);
@@ -148,9 +148,9 @@ export const OwnerDashboard = ({ setActiveTab }) => {
       if (c) {
         setOwnerConfig(c);
         setUpiForm({
-          ownerUpiId: c.ownerUpiId || '9030118909@ybl',
+          ownerUpiId: c.ownerUpiId || localStorage.getItem('fitup_owner_upi') || '9030118909@ybl',
           ownerQrCodeUrl: c.ownerQrCodeUrl || '',
-          razorpayKeyId: c.razorpayKeyId || 'rzp_test_FITUPDemoKey'
+          razorpayKeyId: c.razorpayKeyId || localStorage.getItem('fitup_razorpay_key') || 'rzp_test_TYwrtzZ7ROjR5s'
         });
       }
     } catch (e) {
@@ -175,9 +175,9 @@ export const OwnerDashboard = ({ setActiveTab }) => {
       if (isMounted && cfg) {
         setOwnerConfig(cfg);
         setUpiForm({ 
-          ownerUpiId: cfg.ownerUpiId || '9030118909@ybl', 
+          ownerUpiId: cfg.ownerUpiId || localStorage.getItem('fitup_owner_upi') || '9030118909@ybl', 
           ownerQrCodeUrl: cfg.ownerQrCodeUrl || '',
-          razorpayKeyId: cfg.razorpayKeyId || 'rzp_test_FITUPDemoKey'
+          razorpayKeyId: cfg.razorpayKeyId || localStorage.getItem('fitup_razorpay_key') || 'rzp_test_TYwrtzZ7ROjR5s'
         });
       }
     });
@@ -369,6 +369,19 @@ export const OwnerDashboard = ({ setActiveTab }) => {
   const handleUpdateUPI = async (e) => {
     e.preventDefault();
     soundEffects.playClick();
+
+    // Persist to localStorage for immediate client-side and offline synchronization
+    try {
+      if (upiForm.razorpayKeyId) {
+        localStorage.setItem('fitup_razorpay_key', upiForm.razorpayKeyId.trim());
+      }
+      if (upiForm.ownerUpiId) {
+        localStorage.setItem('fitup_owner_upi', upiForm.ownerUpiId.trim());
+      }
+    } catch (err) {
+      console.warn("Could not save to localStorage:", err);
+    }
+
     await firestoreService.updateOwnerConfig(upiForm);
     showToast("Master Gateway & UPI Details Saved!");
   };
