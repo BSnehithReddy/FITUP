@@ -1160,6 +1160,45 @@ export const AuthModal = ({ setActiveTab, onOpenLegal }) => {
                   )}
                 </button>
 
+                {/* Quick Mode Switcher */}
+                <div className="text-center pt-2">
+                  {authMode === 'login' ? (
+                    <p className="text-xs text-slate-400">
+                      Don't have an account yet?{' '}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          soundEffects.playClick();
+                          setAuthMode('register');
+                          resetFormState();
+                        }}
+                        className={`font-bold hover:underline cursor-pointer ${
+                          persona === 'gym_owner' ? 'text-emerald-400' : 'text-electricBlue'
+                        }`}
+                      >
+                        {persona === 'gym_owner' ? 'Register Facility' : 'Sign Up Free'}
+                      </button>
+                    </p>
+                  ) : (
+                    <p className="text-xs text-slate-400">
+                      Already have an account?{' '}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          soundEffects.playClick();
+                          setAuthMode('login');
+                          resetFormState();
+                        }}
+                        className={`font-bold hover:underline cursor-pointer ${
+                          persona === 'gym_owner' ? 'text-emerald-400' : 'text-electricBlue'
+                        }`}
+                      >
+                        Sign In Here
+                      </button>
+                    </p>
+                  )}
+                </div>
+
                 {/* Legal Consent Disclaimer */}
                 <p className="text-[10px] text-slate-500 text-center leading-relaxed pt-2">
                   By proceeding, you agree to FITUP's{' '}
@@ -1179,6 +1218,7 @@ export const AuthModal = ({ setActiveTab, onOpenLegal }) => {
                     Privacy Policy
                   </button>.
                 </p>
+
 
               </form>
             </div>

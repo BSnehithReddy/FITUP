@@ -297,25 +297,11 @@ export const AuthProvider = ({ children }) => {
       }
     }
 
-    // Default Client Demo Login (Auto-registers client if credentials provided)
-    const newClient = {
-      uid: "usr-client-" + Date.now(),
-      name: "FITUP Member",
-      phone: cleanId,
-      password: password,
-      role: "client",
-      createdAt: new Date().toISOString(),
-      lastLogin: new Date().toISOString()
-    };
-    registeredClients.push(newClient);
-    localStorage.setItem(REGISTERED_CLIENTS_KEY, JSON.stringify(registeredClients));
-    await firestoreService.saveUserProfile(newClient);
-
-    setCurrentUser(newClient);
-    soundEffects.playSuccessChime();
-    closeAuthModal();
-    return { success: true, user: newClient, role: "client" };
+    // 6. IF NO ACCOUNT FOUND ANYWHERE -> REJECT WITH CLEAR SIGN-UP GUIDANCE
+    soundEffects.playError();
+    throw new Error(`No registered FITUP account found with mobile number +91 ${cleanId}. Please click 'Register' / 'Sign Up' first to create your account.`);
   };
+
 
   /**
    * Universal Registration with Firebase Auth and Firestore `users/{uid}` persistence
@@ -424,9 +410,18 @@ export const AuthProvider = ({ children }) => {
    */
   const registerGymOwner = async (ownerName, gymName, location, ownerPhone, ownerEmail, ownerPassword, address = '') => {
     soundEffects.playClick();
-    const gymId = 'gym-' + Date.now();
     const cleanEmail = (ownerEmail || '').toLowerCase().trim();
     const cleanPhone = (ownerPhone || '').trim();
+    
+    // Check if Gym Owner with same phone or email already registered
+    const gyms = firestoreService.getGymsSync();
+    const existingGym = gyms.find(g => (cleanPhone && g.ownerPhone === cleanPhone) || (cleanEmail && g.ownerEmail?.toLowerCase() === cleanEmail));
+    if (existingGym) {
+      soundEffects.playError();
+      throw new Error(`A facility is already registered with this mobile/email (${existingGym.name}). Please click 'Sign In' instead.`);
+    }
+
+    const gymId = 'gym-' + Date.now();
     let uid = 'usr-gym-' + gymId;
 
     if (cleanEmail && ownerPassword) {
@@ -441,9 +436,14 @@ export const AuthProvider = ({ children }) => {
           }
         }
       } catch (authErr) {
+        if (authErr.code === 'auth/email-already-in-use') {
+          soundEffects.playError();
+          throw new Error("This business email is already registered. Please Sign In.");
+        }
         console.warn("Firebase Auth gym owner creation notice:", authErr.message);
       }
     }
+
 
     const newGym = {
       gymId,

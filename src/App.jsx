@@ -85,7 +85,13 @@ const MainContent = () => {
           {activeTab === 'role_select' && (
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
               <RoleSelectionPage
-                onSelectEnthusiast={() => setActiveTab('home')}
+                onSelectEnthusiast={() => {
+                  if (currentUser) {
+                    setActiveTab('home');
+                  } else {
+                    openAuthModal('register', 'client');
+                  }
+                }}
                 onSelectGymOwner={() => {
                   if (currentUser?.role === 'gym_owner') {
                     setActiveTab('gym_owner_dash');
@@ -98,6 +104,7 @@ const MainContent = () => {
               />
             </div>
           )}
+
 
           {(activeTab === 'home' || activeTab === 'my_bookings') && (
             <ClientDashboard activeTab={activeTab} setActiveTab={setActiveTab} onOpenLegal={openLegal} />
