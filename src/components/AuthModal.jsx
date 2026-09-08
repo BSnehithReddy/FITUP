@@ -4,7 +4,8 @@ import { soundEffects } from '../services/soundEffects';
 import { 
   Eye, EyeOff, Lock, Phone, Mail, User, X, 
   ShieldCheck, AlertCircle, CheckCircle2, ArrowLeft, 
-  KeyRound, MessageSquareCode, Sparkles, RefreshCw 
+  KeyRound, MessageSquareCode, Sparkles, RefreshCw,
+  Building2, Dumbbell, MapPin
 } from 'lucide-react';
 
 export const AuthModal = ({ setActiveTab, onOpenLegal }) => {
@@ -15,17 +16,31 @@ export const AuthModal = ({ setActiveTab, onOpenLegal }) => {
     setAuthMode, 
     login, 
     register, 
+    registerGymOwner,
     sendPhoneOtp, 
     verifyOtpAndSetPassword 
   } = useAuth();
   
-  // Login / Register states
+  // Persona state: 'client' (Gym Enthusiast) | 'gym_owner' (Gym Owner)
+  const [persona, setPersona] = useState('client');
+
+  // Client Login / Register fields
   const [identifier, setIdentifier] = useState(''); // Email or Phone for login
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+
+  // Gym Owner specific registration fields
+  const [ownerName, setOwnerName] = useState('');
+  const [gymName, setGymName] = useState('');
+  const [location, setLocation] = useState('');
+  const [ownerPhone, setOwnerPhone] = useState('');
+  const [ownerEmail, setOwnerEmail] = useState('');
+  const [ownerPassword, setOwnerPassword] = useState('');
+  const [ownerConfirmPassword, setOwnerConfirmPassword] = useState('');
+  const [showOwnerPassword, setShowOwnerPassword] = useState(false);
 
   // Phone OTP Forgot Password states
   const [resetPhone, setResetPhone] = useState('');
@@ -67,7 +82,7 @@ export const AuthModal = ({ setActiveTab, onOpenLegal }) => {
     setOtpCode('');
     setNewPassword('');
     setConfirmPassword('');
-    const rawDigits = identifier.replace(/\D/g, '');
+    const rawDigits = (identifier || ownerPhone || phone).replace(/\D/g, '');
     if (rawDigits.length === 10) {
       setResetPhone(rawDigits);
     }
@@ -118,7 +133,6 @@ export const AuthModal = ({ setActiveTab, onOpenLegal }) => {
 
     setLoading(true);
     try {
-      // Advance to password update step
       setOtpStep('enter_new_password');
       setSuccessMessage('OTP Verified Successfully! Enter your new password below.');
       soundEffects.playSuccessChime();
@@ -174,29 +188,59 @@ export const AuthModal = ({ setActiveTab, onOpenLegal }) => {
     soundEffects.playClick();
     resetFormState();
 
-    if (authMode === 'register') {
-      if (!name) {
-        soundEffects.playError();
-        setErrorMessage('Please enter your full name.');
+    // =========================================================
+    // PERSONA 1: GYM ENTHUSIAST (USER / CLIENT)
+    // =========================================================
+    if (persona === 'client') {
+      if (authMode === 'register') {
+        if (!name.trim()) {
+          soundEffects.playError();
+          setErrorMessage('Please enter your full name.');
+          return;
+        }
+        if (!email.trim() && !phone.trim()) {
+          soundEffects.playError();
+          setErrorMessage('Please provide either an Email or Phone Number.');
+          return;
+        }
+        if (!password || password.length < 6) {
+          soundEffects.playError();
+          setErrorMessage('Password must be at least 6 characters.');
+          return;
+        }
+
+        setLoading(true);
+        try {
+          const primaryId = email.trim() || phone.trim();
+          const res = await register(name, primaryId, password, { 
+            email: email.trim(), 
+            phone: phone.trim(), 
+            role: 'client' 
+          });
+          
+          if (res.role === 'owner') {
+            setActiveTab('owner_dash');
+          } else {
+            setActiveTab('home');
+          }
+        } catch (err) {
+          setErrorMessage(err.message || 'Registration failed.');
+        } finally {
+          setLoading(false);
+        }
         return;
       }
-      if (!email && !phone) {
+
+      // Client Login Mode
+      if (!identifier.trim() || !password) {
         soundEffects.playError();
-        setErrorMessage('Please provide either an Email or Phone Number.');
-        return;
-      }
-      if (!password || password.length < 6) {
-        soundEffects.playError();
-        setErrorMessage('Password must be at least 6 characters.');
+        setErrorMessage('Please enter your Email / Phone Number and Password.');
         return;
       }
 
       setLoading(true);
       try {
-        const primaryId = email || phone;
-        const res = await register(name, primaryId, password, { email, phone });
-        
-        // Dynamic Role-Based Redirection
+        const res = await login(identifier.trim(), password);
         if (res.role === 'owner') {
           setActiveTab('owner_dash');
         } else if (res.role === 'gym_owner') {
@@ -207,44 +251,103 @@ export const AuthModal = ({ setActiveTab, onOpenLegal }) => {
           setActiveTab('home');
         }
       } catch (err) {
-        setErrorMessage(err.message || 'Registration failed.');
+        setErrorMessage(err.message || 'Incorrect credentials or account not found.');
       } finally {
         setLoading(false);
       }
       return;
     }
 
-    // Login Mode
-    if (!identifier || !password) {
-      soundEffects.playError();
-      setErrorMessage('Please enter your Email / Phone Number and Password.');
-      return;
-    }
+    // =========================================================
+    // PERSONA 2: GYM OWNER (PARTNER FACILITY)
+    // =========================================================
+    if (persona === 'gym_owner') {
+      if (authMode === 'register') {
+        if (!ownerName.trim()) {
+          soundEffects.playError();
+          setErrorMessage('Please enter the Gym Owner / Manager name.');
+          return;
+        }
+        if (!gymName.trim()) {
+          soundEffects.playError();
+          setErrorMessage('Please enter your Gym or Fitness Studio name.');
+          return;
+        }
+        if (!location.trim()) {
+          soundEffects.playError();
+          setErrorMessage('Please enter your Gym Area / City (e.g. Madhapur, Hyderabad).');
+          return;
+        }
+        const cleanOwnerPhone = ownerPhone.replace(/\D/g, '').slice(-10);
+        if (cleanOwnerPhone.length !== 10) {
+          soundEffects.playError();
+          setErrorMessage('Please enter a valid 10-digit mobile number for booking alerts & UPI payouts.');
+          return;
+        }
+        if (!ownerEmail.trim()) {
+          soundEffects.playError();
+          setErrorMessage('Please enter your Gym Owner email address.');
+          return;
+        }
+        if (!ownerPassword || ownerPassword.length < 6) {
+          soundEffects.playError();
+          setErrorMessage('Password must be at least 6 characters.');
+          return;
+        }
+        if (ownerPassword !== ownerConfirmPassword) {
+          soundEffects.playError();
+          setErrorMessage('Passwords do not match. Please verify.');
+          return;
+        }
 
-    setLoading(true);
-    try {
-      const res = await login(identifier, password);
-      
-      // Dynamic Role-Based Redirection
-      if (res.role === 'owner') {
-        setActiveTab('owner_dash');
-      } else if (res.role === 'gym_owner') {
-        setActiveTab('gym_owner_dash');
-      } else if (res.role === 'trainer') {
-        setActiveTab('trainer_dash');
-      } else {
-        setActiveTab('home');
+        setLoading(true);
+        try {
+          const res = await registerGymOwner(
+            ownerName.trim(),
+            gymName.trim(),
+            location.trim(),
+            cleanOwnerPhone,
+            ownerEmail.trim(),
+            ownerPassword
+          );
+          
+          setActiveTab('gym_owner_dash');
+        } catch (err) {
+          setErrorMessage(err.message || 'Gym registration failed. Please try again.');
+        } finally {
+          setLoading(false);
+        }
+        return;
       }
-    } catch (err) {
-      setErrorMessage(err.message || 'Incorrect password or account credentials.');
-    } finally {
-      setLoading(false);
+
+      // Gym Owner Login Mode
+      if (!identifier.trim() || !password) {
+        soundEffects.playError();
+        setErrorMessage('Please enter your Owner Mobile / Email and Password.');
+        return;
+      }
+
+      setLoading(true);
+      try {
+        const res = await login(identifier.trim(), password);
+        if (res.role === 'gym_owner') {
+          setActiveTab('gym_owner_dash');
+        } else if (res.role === 'owner') {
+          setActiveTab('owner_dash');
+        } else {
+          setActiveTab('gym_owner_dash');
+        }
+      } catch (err) {
+        setErrorMessage(err.message || 'Incorrect Gym Owner credentials.');
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
   return (
-    <div className="fixed inset-0 z-[9990] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn">
-      <div className="relative w-full max-w-md bg-slate-900 border border-white/10 rounded-3xl shadow-[0_0_50px_rgba(0,0,0,0.8)] overflow-hidden">
+    <div className="fixed inset-0 z-[9990] flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-fadeIn overflow-y-auto">
+      <div className="relative w-full max-w-lg bg-slate-900 border border-white/10 rounded-3xl shadow-[0_0_60px_rgba(0,0,0,0.85)] overflow-hidden my-6">
         
         {/* Glow Effects Header */}
         <div className="h-2 bg-gradient-to-r from-electricBlue via-blue-500 to-vibrantOrange" />
@@ -255,53 +358,105 @@ export const AuthModal = ({ setActiveTab, onOpenLegal }) => {
         {/* Close Button */}
         <button
           onClick={() => { soundEffects.playClick(); closeAuthModal(); }}
-          className="absolute top-4 right-4 text-slate-400 hover:text-white p-2 rounded-xl hover:bg-slate-800 transition-colors"
+          className="absolute top-4 right-4 text-slate-400 hover:text-white p-2 rounded-xl hover:bg-slate-800 transition-colors z-20"
         >
           <X className="w-5 h-5" />
         </button>
 
-        <div className="p-8">
+        <div className="p-6 sm:p-8">
           
+          {/* Persona Selector (Gym Enthusiast vs Gym Owner) */}
+          {authMode !== 'forgot_password' && (
+            <div className="mb-6 space-y-2">
+              <span className="text-[10px] uppercase font-bold tracking-[0.2em] text-slate-400 block text-center">
+                Select Your Role
+              </span>
+              <div className="grid grid-cols-2 gap-2 bg-slate-950 p-1.5 rounded-2xl border border-white/5">
+                
+                {/* Option 1: Gym Enthusiast */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundEffects.playClick();
+                    setPersona('client');
+                    resetFormState();
+                  }}
+                  className={`py-3 px-2 rounded-xl text-xs font-bold transition-all flex flex-col items-center justify-center gap-1.5 ${
+                    persona === 'client'
+                      ? 'bg-gradient-to-r from-electricBlue to-blue-500 text-slate-950 shadow-[0_0_20px_rgba(0,240,255,0.4)] scale-[1.02]'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                  }`}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <Dumbbell className="w-4 h-4" />
+                    <span>Gym Enthusiast</span>
+                  </div>
+                  <span className={`text-[10px] font-normal ${persona === 'client' ? 'text-slate-900 font-medium' : 'text-slate-500'}`}>
+                    Book ₹200-₹280 Passes
+                  </span>
+                </button>
+
+                {/* Option 2: Gym Owner */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundEffects.playClick();
+                    setPersona('gym_owner');
+                    resetFormState();
+                  }}
+                  className={`py-3 px-2 rounded-xl text-xs font-bold transition-all flex flex-col items-center justify-center gap-1.5 ${
+                    persona === 'gym_owner'
+                      ? 'bg-gradient-to-r from-emerald-400 to-teal-500 text-slate-950 shadow-[0_0_20px_rgba(52,211,153,0.4)] scale-[1.02]'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                  }`}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <Building2 className="w-4 h-4" />
+                    <span>Gym Owner</span>
+                  </div>
+                  <span className={`text-[10px] font-normal ${persona === 'gym_owner' ? 'text-slate-900 font-medium' : 'text-slate-500'}`}>
+                    List Facility & Trainers
+                  </span>
+                </button>
+
+              </div>
+            </div>
+          )}
+
           {/* Modal Branding Header */}
           <div className="text-center mb-6">
             <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-electricBlue/10 border border-electricBlue/30 text-electricBlue mb-3 shadow-[0_0_15px_rgba(0,240,255,0.2)]">
               {authMode === 'forgot_password' ? (
                 <MessageSquareCode className="w-6 h-6 text-electricBlue" />
+              ) : persona === 'gym_owner' ? (
+                <Building2 className="w-6 h-6 text-emerald-400" />
               ) : (
-                <ShieldCheck className="w-6 h-6 text-electricBlue" />
+                <Dumbbell className="w-6 h-6 text-electricBlue" />
               )}
             </div>
             
             <h2 className="text-2xl font-black text-white font-outfit">
-              {authMode === 'login' 
-                ? 'Welcome to FITUP' 
-                : authMode === 'register' 
-                ? 'Create an Account' 
-                : otpStep === 'enter_phone'
-                ? 'Reset via Phone OTP'
-                : otpStep === 'enter_otp'
-                ? 'Verify 6-Digit Code'
-                : otpStep === 'enter_new_password'
-                ? 'Set New Password'
-                : 'Password Reset!'}
+              {authMode === 'forgot_password'
+                ? 'Reset Password'
+                : persona === 'gym_owner'
+                ? (authMode === 'login' ? 'Gym Partner Portal' : 'Register Your Gym Facility')
+                : (authMode === 'login' ? 'Welcome to FITUP' : 'Create User Account')}
             </h2>
 
             <p className="text-xs text-slate-400 mt-1">
-              {authMode === 'login' 
-                ? 'Sign in to access your workout passes and gym dashboard' 
-                : authMode === 'register'
-                ? 'Book single-session gym trials with zero subscriptions'
-                : otpStep === 'enter_phone'
+              {authMode === 'forgot_password'
                 ? 'Enter your registered mobile number for instant SMS verification'
-                : otpStep === 'enter_otp'
-                ? `Enter the 6-digit code sent via SMS to +91 ${verifiedPhone}`
-                : otpStep === 'enter_new_password'
-                ? 'Choose a secure new password for your FITUP account'
-                : 'Your password has been successfully updated.'}
+                : persona === 'gym_owner'
+                ? (authMode === 'login' 
+                    ? 'Sign in to access facility bookings, trainer roster & 30% wallet' 
+                    : 'List your gym arena, configure trainers & receive 24-48h UPI payouts')
+                : (authMode === 'login' 
+                    ? 'Sign in to access your workout passes and instant gym check-in' 
+                    : 'Book single-session gym trials with zero subscriptions or monthly lock-ins')}
             </p>
           </div>
 
-          {/* Mode Switcher Tabs (Hidden on Forgot Password view) */}
+          {/* Sign In vs Register Tabs */}
           {authMode !== 'forgot_password' ? (
             <div className="flex bg-slate-950 p-1 rounded-xl mb-6 border border-white/5">
               <button
@@ -309,7 +464,9 @@ export const AuthModal = ({ setActiveTab, onOpenLegal }) => {
                 onClick={() => { soundEffects.playClick(); setAuthMode('login'); resetFormState(); }}
                 className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
                   authMode === 'login'
-                    ? 'bg-electricBlue text-slate-950 shadow-[0_0_15px_rgba(0,240,255,0.4)]'
+                    ? (persona === 'gym_owner' 
+                        ? 'bg-emerald-400 text-slate-950 shadow-[0_0_15px_rgba(52,211,153,0.4)]' 
+                        : 'bg-electricBlue text-slate-950 shadow-[0_0_15px_rgba(0,240,255,0.4)]')
                     : 'text-slate-400 hover:text-white'
                 }`}
               >
@@ -320,11 +477,13 @@ export const AuthModal = ({ setActiveTab, onOpenLegal }) => {
                 onClick={() => { soundEffects.playClick(); setAuthMode('register'); resetFormState(); }}
                 className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
                   authMode === 'register'
-                    ? 'bg-electricBlue text-slate-950 shadow-[0_0_15px_rgba(0,240,255,0.4)]'
+                    ? (persona === 'gym_owner' 
+                        ? 'bg-emerald-400 text-slate-950 shadow-[0_0_15px_rgba(52,211,153,0.4)]' 
+                        : 'bg-electricBlue text-slate-950 shadow-[0_0_15px_rgba(0,240,255,0.4)]')
                     : 'text-slate-400 hover:text-white'
                 }`}
               >
-                Register
+                {persona === 'gym_owner' ? 'Register Facility' : 'Register User'}
               </button>
             </div>
           ) : (
@@ -560,129 +719,337 @@ export const AuthModal = ({ setActiveTab, onOpenLegal }) => {
           )}
 
           {/* ========================================================= */}
-          {/* SIGN IN & REGISTRATION FORMS */}
+          {/* SIGN IN & REGISTRATION FORMS (DUAL PERSONA) */}
           {/* ========================================================= */}
           {authMode !== 'forgot_password' && (
             <form onSubmit={handleLoginOrRegister} className="space-y-4">
               
-              {/* REGISTER VIEW FIELDS */}
-              {authMode === 'register' && (
+              {/* ======================================================= */}
+              {/* PERSONA 1: GYM ENTHUSIAST (USER) FORMS */}
+              {/* ======================================================= */}
+              {persona === 'client' && (
                 <>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-300 mb-1">
-                      Full Name
-                    </label>
-                    <div className="relative">
-                      <User className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
-                      <input
-                        type="text"
-                        required
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        placeholder="e.g. Karthik Reddy"
-                        className="w-full bg-slate-950 border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-electricBlue focus:ring-1 focus:ring-electricBlue transition-all"
-                      />
-                    </div>
-                  </div>
+                  {authMode === 'register' && (
+                    <>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-300 mb-1">
+                          Full Name
+                        </label>
+                        <div className="relative">
+                          <User className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
+                          <input
+                            type="text"
+                            required
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
+                            placeholder="e.g. Karthik Reddy"
+                            className="w-full bg-slate-950 border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-electricBlue focus:ring-1 focus:ring-electricBlue transition-all"
+                          />
+                        </div>
+                      </div>
 
-                  <div>
-                    <label className="block text-xs font-medium text-slate-300 mb-1">
-                      Email Address
-                    </label>
-                    <div className="relative">
-                      <Mail className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
-                      <input
-                        type="email"
-                        required
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder="e.g. karthik@example.com"
-                        className="w-full bg-slate-950 border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-electricBlue focus:ring-1 focus:ring-electricBlue transition-all"
-                      />
-                    </div>
-                  </div>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-300 mb-1">
+                          Email Address
+                        </label>
+                        <div className="relative">
+                          <Mail className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
+                          <input
+                            type="email"
+                            required
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            placeholder="e.g. karthik@example.com"
+                            className="w-full bg-slate-950 border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-electricBlue focus:ring-1 focus:ring-electricBlue transition-all"
+                          />
+                        </div>
+                      </div>
 
+                      <div>
+                        <label className="block text-xs font-medium text-slate-300 mb-1">
+                          Mobile Number (Optional for SMS Passes)
+                        </label>
+                        <div className="relative">
+                          <Phone className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
+                          <input
+                            type="tel"
+                            maxLength={10}
+                            value={phone}
+                            onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
+                            placeholder="e.g. 9876543210"
+                            className="w-full bg-slate-950 border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-electricBlue focus:ring-1 focus:ring-electricBlue transition-all font-mono"
+                          />
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  {authMode === 'login' && (
+                    <div>
+                      <label className="block text-xs font-medium text-slate-300 mb-1">
+                        Email Address or Mobile Number
+                      </label>
+                      <div className="relative">
+                        <User className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
+                        <input
+                          type="text"
+                          required
+                          value={identifier}
+                          onChange={(e) => setIdentifier(e.target.value)}
+                          placeholder="e.g. user@example.com or 9030118909"
+                          className="w-full bg-slate-950 border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-electricBlue focus:ring-1 focus:ring-electricBlue transition-all"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Password Field */}
                   <div>
-                    <label className="block text-xs font-medium text-slate-300 mb-1">
-                      Mobile Number
-                    </label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-xs font-medium text-slate-300">
+                        Password
+                      </label>
+                      {authMode === 'login' && (
+                        <button
+                          type="button"
+                          onClick={handleOpenForgotPassword}
+                          className="text-[11px] text-electricBlue hover:underline transition-colors font-medium flex items-center gap-1"
+                        >
+                          <KeyRound className="w-3 h-3" /> Forgot Password?
+                        </button>
+                      )}
+                    </div>
                     <div className="relative">
-                      <Phone className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
+                      <Lock className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
                       <input
-                        type="tel"
-                        value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
-                        placeholder="e.g. 9876543210"
-                        className="w-full bg-slate-950 border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-electricBlue focus:ring-1 focus:ring-electricBlue transition-all font-mono"
+                        type={showPassword ? "text" : "password"}
+                        required
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="••••••••"
+                        className="w-full bg-slate-950 border border-white/10 rounded-xl pl-10 pr-10 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-electricBlue transition-all"
                       />
+                      
+                      <button
+                        type="button"
+                        onClick={() => { soundEffects.playClick(); setShowPassword(!showPassword); }}
+                        className="absolute right-3.5 top-3 text-slate-400 hover:text-white transition-colors"
+                        title={showPassword ? "Hide Password" : "Show Password"}
+                      >
+                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
                     </div>
                   </div>
                 </>
               )}
 
-              {/* LOGIN VIEW FIELDS */}
-              {authMode === 'login' && (
-                <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1">
-                    Email Address or Mobile Number
-                  </label>
-                  <div className="relative">
-                    <User className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
-                    <input
-                      type="text"
-                      required
-                      value={identifier}
-                      onChange={(e) => setIdentifier(e.target.value)}
-                      placeholder="e.g. user@example.com or 9030118909"
-                      className="w-full bg-slate-950 border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-electricBlue focus:ring-1 focus:ring-electricBlue transition-all"
-                    />
-                  </div>
-                </div>
-              )}
+              {/* ======================================================= */}
+              {/* PERSONA 2: GYM OWNER FORMS */}
+              {/* ======================================================= */}
+              {persona === 'gym_owner' && (
+                <>
+                  {authMode === 'register' && (
+                    <>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium text-slate-300 mb-1">
+                            Owner / Manager Name
+                          </label>
+                          <div className="relative">
+                            <User className="absolute left-3.5 top-3 w-4 h-4 text-emerald-400" />
+                            <input
+                              type="text"
+                              required
+                              value={ownerName}
+                              onChange={(e) => setOwnerName(e.target.value)}
+                              placeholder="e.g. Vinay Reddy"
+                              className="w-full bg-slate-950 border border-white/10 rounded-xl pl-10 pr-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-400 transition-all"
+                            />
+                          </div>
+                        </div>
 
-              {/* PASSWORD FIELD */}
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-xs font-medium text-slate-300">
-                    Password
-                  </label>
-                  {authMode === 'login' && (
-                    <button
-                      type="button"
-                      onClick={handleOpenForgotPassword}
-                      className="text-[11px] text-electricBlue hover:underline transition-colors font-medium flex items-center gap-1"
-                    >
-                      <KeyRound className="w-3 h-3" /> Forgot Password?
-                    </button>
+                        <div>
+                          <label className="block text-xs font-medium text-slate-300 mb-1">
+                            Gym Facility Name
+                          </label>
+                          <div className="relative">
+                            <Building2 className="absolute left-3.5 top-3 w-4 h-4 text-emerald-400" />
+                            <input
+                              type="text"
+                              required
+                              value={gymName}
+                              onChange={(e) => setGymName(e.target.value)}
+                              placeholder="e.g. GS Fitness Studio"
+                              className="w-full bg-slate-950 border border-white/10 rounded-xl pl-10 pr-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-400 transition-all"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-slate-300 mb-1">
+                          Location / Area
+                        </label>
+                        <div className="relative">
+                          <MapPin className="absolute left-3.5 top-3 w-4 h-4 text-emerald-400" />
+                          <input
+                            type="text"
+                            required
+                            value={location}
+                            onChange={(e) => setLocation(e.target.value)}
+                            placeholder="e.g. Chengicherla, Hyderabad"
+                            className="w-full bg-slate-950 border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-400 transition-all"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium text-slate-300 mb-1">
+                            Owner Mobile (for UPI Payouts)
+                          </label>
+                          <div className="relative">
+                            <Phone className="absolute left-3.5 top-3 w-4 h-4 text-emerald-400" />
+                            <input
+                              type="tel"
+                              required
+                              maxLength={10}
+                              value={ownerPhone}
+                              onChange={(e) => setOwnerPhone(e.target.value.replace(/\D/g, ''))}
+                              placeholder="e.g. 9123456780"
+                              className="w-full bg-slate-950 border border-white/10 rounded-xl pl-10 pr-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-400 font-mono"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-medium text-slate-300 mb-1">
+                            Owner Email
+                          </label>
+                          <div className="relative">
+                            <Mail className="absolute left-3.5 top-3 w-4 h-4 text-emerald-400" />
+                            <input
+                              type="email"
+                              required
+                              value={ownerEmail}
+                              onChange={(e) => setOwnerEmail(e.target.value)}
+                              placeholder="e.g. owner@gsfitness.com"
+                              className="w-full bg-slate-950 border border-white/10 rounded-xl pl-10 pr-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-400"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium text-slate-300 mb-1">
+                            Password (Min 6 Chars)
+                          </label>
+                          <div className="relative">
+                            <Lock className="absolute left-3.5 top-3 w-4 h-4 text-emerald-400" />
+                            <input
+                              type={showOwnerPassword ? "text" : "password"}
+                              required
+                              value={ownerPassword}
+                              onChange={(e) => setOwnerPassword(e.target.value)}
+                              placeholder="••••••••"
+                              className="w-full bg-slate-950 border border-white/10 rounded-xl pl-10 pr-10 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-400"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => { soundEffects.playClick(); setShowOwnerPassword(!showOwnerPassword); }}
+                              className="absolute right-3 top-3 text-slate-400 hover:text-white"
+                            >
+                              {showOwnerPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                            </button>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-medium text-slate-300 mb-1">
+                            Confirm Password
+                          </label>
+                          <div className="relative">
+                            <Lock className="absolute left-3.5 top-3 w-4 h-4 text-emerald-400" />
+                            <input
+                              type={showOwnerPassword ? "text" : "password"}
+                              required
+                              value={ownerConfirmPassword}
+                              onChange={(e) => setOwnerConfirmPassword(e.target.value)}
+                              placeholder="••••••••"
+                              className="w-full bg-slate-950 border border-white/10 rounded-xl pl-10 pr-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-400"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </>
                   )}
-                </div>
-                <div className="relative">
-                  <Lock className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    required
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    className="w-full bg-slate-950 border border-white/10 rounded-xl pl-10 pr-10 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-electricBlue focus:ring-1 focus:ring-electricBlue transition-all"
-                  />
-                  
-                  <button
-                    type="button"
-                    onClick={() => { soundEffects.playClick(); setShowPassword(!showPassword); }}
-                    className="absolute right-3.5 top-3 text-slate-400 hover:text-white transition-colors"
-                    title={showPassword ? "Hide Password" : "Show Password"}
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
+
+                  {authMode === 'login' && (
+                    <>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-300 mb-1">
+                          Owner Mobile or Email
+                        </label>
+                        <div className="relative">
+                          <Building2 className="absolute left-3.5 top-3 w-4 h-4 text-emerald-400" />
+                          <input
+                            type="text"
+                            required
+                            value={identifier}
+                            onChange={(e) => setIdentifier(e.target.value)}
+                            placeholder="e.g. 9123456780 or owner@gsfitness.com"
+                            className="w-full bg-slate-950 border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-400"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="block text-xs font-medium text-slate-300">
+                            Password
+                          </label>
+                          <button
+                            type="button"
+                            onClick={handleOpenForgotPassword}
+                            className="text-[11px] text-emerald-400 hover:underline transition-colors font-medium flex items-center gap-1"
+                          >
+                            <KeyRound className="w-3 h-3" /> Forgot Password?
+                          </button>
+                        </div>
+                        <div className="relative">
+                          <Lock className="absolute left-3.5 top-3 w-4 h-4 text-emerald-400" />
+                          <input
+                            type={showPassword ? "text" : "password"}
+                            required
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            placeholder="••••••••"
+                            className="w-full bg-slate-950 border border-white/10 rounded-xl pl-10 pr-10 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-400"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => { soundEffects.playClick(); setShowPassword(!showPassword); }}
+                            className="absolute right-3.5 top-3 text-slate-400 hover:text-white"
+                          >
+                            {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </button>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </>
+              )}
 
               {/* SUBMIT BUTTON */}
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-3 px-4 bg-gradient-to-r from-electricBlue via-blue-500 to-vibrantOrange hover:from-blue-400 hover:to-electricBlue text-slate-950 font-bold rounded-xl shadow-[0_0_20px_rgba(0,240,255,0.4)] transition-all transform active:scale-95 disabled:opacity-50 mt-2 text-sm"
+                className={`w-full py-3.5 px-4 font-bold rounded-xl transition-all transform active:scale-95 disabled:opacity-50 mt-2 text-sm flex items-center justify-center space-x-2 text-slate-950 ${
+                  persona === 'gym_owner'
+                    ? 'bg-gradient-to-r from-emerald-400 via-teal-400 to-emerald-500 hover:from-emerald-300 hover:to-teal-300 shadow-[0_0_20px_rgba(52,211,153,0.4)]'
+                    : 'bg-gradient-to-r from-electricBlue via-blue-500 to-vibrantOrange hover:from-blue-400 hover:to-electricBlue shadow-[0_0_20px_rgba(0,240,255,0.4)]'
+                }`}
               >
                 {loading ? (
                   <span className="flex items-center justify-center space-x-2">
@@ -690,9 +1057,9 @@ export const AuthModal = ({ setActiveTab, onOpenLegal }) => {
                     <span>Processing...</span>
                   </span>
                 ) : authMode === 'login' ? (
-                  'Sign In to FITUP'
+                  persona === 'gym_owner' ? 'Sign In to Gym Portal' : 'Sign In to FITUP'
                 ) : (
-                  'Create FITUP Account'
+                  persona === 'gym_owner' ? 'Register Facility & Launch' : 'Create FITUP Account'
                 )}
               </button>
 
@@ -724,5 +1091,3 @@ export const AuthModal = ({ setActiveTab, onOpenLegal }) => {
     </div>
   );
 };
-
-

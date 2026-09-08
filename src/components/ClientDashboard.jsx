@@ -390,11 +390,65 @@ export const ClientDashboard = ({ activeTab = 'home', setActiveTab }) => {
               </div>
             </div>
 
+            {/* Dual Persona Choice Quick Banner */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+              
+              {/* Persona 1: Gym Enthusiast */}
+              <div className="p-4 rounded-2xl bg-slate-900/90 border border-electricBlue/30 flex items-center justify-between gap-4 hover:border-electricBlue transition-all shadow-lg">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 rounded-xl bg-electricBlue/10 border border-electricBlue/30 text-electricBlue flex items-center justify-center font-bold flex-shrink-0">
+                    <Dumbbell className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-extrabold text-white font-outfit">Gym Enthusiast</h3>
+                    <p className="text-[11px] text-slate-400">Book single slots • ₹200-₹280 with PT</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    const searchEl = document.getElementById('gym-search-input');
+                    if (searchEl) searchEl.focus();
+                  }}
+                  className="px-3 py-1.5 bg-electricBlue/10 border border-electricBlue/40 text-electricBlue hover:bg-electricBlue hover:text-slate-950 text-xs font-bold rounded-xl transition-all whitespace-nowrap"
+                >
+                  Find Gyms ↓
+                </button>
+              </div>
+
+              {/* Persona 2: Gym Owner */}
+              <div className="p-4 rounded-2xl bg-slate-900/90 border border-emerald-400/30 flex items-center justify-between gap-4 hover:border-emerald-400 transition-all shadow-lg">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-400/10 border border-emerald-400/30 text-emerald-400 flex items-center justify-center font-bold flex-shrink-0">
+                    <Building2 className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-extrabold text-white font-outfit">Gym Owner</h3>
+                    <p className="text-[11px] text-slate-400">List arena, trainers & receive 24-48h UPI</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    soundEffects.playClick();
+                    if (currentUser?.role === 'gym_owner') {
+                      setActiveTab('gym_owner_dash');
+                    } else {
+                      openAuthModal('register');
+                    }
+                  }}
+                  className="px-3 py-1.5 bg-emerald-400 text-slate-950 font-black rounded-xl text-xs shadow-[0_0_15px_#34d399] hover:scale-105 transition-all whitespace-nowrap"
+                >
+                  {currentUser?.role === 'gym_owner' ? 'Open Dashboard →' : 'List Your Gym →'}
+                </button>
+              </div>
+
+            </div>
+
             {/* Instant Search Bar & Location Chips */}
             <div className="grid grid-cols-1 md:grid-cols-12 gap-4 z-10 relative">
               <div className="md:col-span-8 relative">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                 <input
+                  id="gym-search-input"
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}

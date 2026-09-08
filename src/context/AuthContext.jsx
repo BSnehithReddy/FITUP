@@ -415,8 +415,80 @@ export const AuthProvider = ({ children }) => {
   };
 
   /**
-   * Helper: Register a Gym Owner with Firebase Auth & Firestore `users/{uid}`
+   * Helper: Register a Gym Owner with Firebase Auth, Firestore `gyms/{gymId}` and `users/{uid}`
    */
+  const registerGymOwner = async (ownerName, gymName, location, ownerPhone, ownerEmail, ownerPassword, address = '') => {
+    soundEffects.playClick();
+    const gymId = 'gym-' + Date.now();
+    const cleanEmail = (ownerEmail || '').toLowerCase().trim();
+    const cleanPhone = (ownerPhone || '').trim();
+    let uid = 'usr-gym-' + gymId;
+
+    if (cleanEmail && ownerPassword) {
+      try {
+        const cred = await createUserWithEmailAndPassword(auth, cleanEmail, ownerPassword);
+        if (cred?.user?.uid) {
+          uid = cred.user.uid;
+          if (ownerName) {
+            try {
+              await updateProfile(cred.user, { displayName: ownerName });
+            } catch (e) {}
+          }
+        }
+      } catch (authErr) {
+        console.warn("Firebase Auth gym owner creation notice:", authErr.message);
+      }
+    }
+
+    const newGym = {
+      gymId,
+      name: gymName || `${ownerName}'s Fitness`,
+      location: location || "Hyderabad",
+      address: address || `${location || 'Hyderabad'}`,
+      image: "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&w=800&q=80",
+      rating: 5.0,
+      reviewCount: 0,
+      startingPrice: 280,
+      amenities: ["AC", "Free Locker", "Steam Bath", "Protein Bar"],
+      ownerName: ownerName,
+      ownerPhone: cleanPhone,
+      ownerEmail: cleanEmail,
+      ownerPassword: ownerPassword,
+      gymSplitPercent: 30,
+      walletBalance: 0,
+      ownerUpiId: `${cleanPhone}@upi`,
+      ownerQrCodeUrl: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=upi://pay?pa=${cleanPhone}@upi&pn=${encodeURIComponent(gymName)}&am=280&cu=INR`,
+      socialHandles: {
+        instagram: "",
+        whatsapp: cleanPhone,
+        website: ""
+      },
+      createdAt: new Date().toISOString()
+    };
+
+    await firestoreService.saveGym(newGym);
+
+    const ownerProfile = {
+      uid,
+      name: ownerName || (gymName + " Owner"),
+      email: cleanEmail,
+      phone: cleanPhone,
+      password: ownerPassword,
+      gymId: gymId,
+      gymName: gymName,
+      role: "gym_owner",
+      createdAt: new Date().toISOString(),
+      lastLogin: new Date().toISOString()
+    };
+
+    await firestoreService.saveUserProfile(ownerProfile);
+    await firestoreService.updateUserLastLogin(uid);
+    setCurrentUser(ownerProfile);
+    soundEffects.playSuccessChime();
+    closeAuthModal();
+    return { success: true, user: ownerProfile, role: "gym_owner", gym: newGym };
+  };
+
   const registerGymOwnerAuth = async (ownerName, ownerEmail, ownerPhone, ownerPassword, gymId, gymName) => {
     let uid = 'usr-gym-' + (gymId || Date.now());
     const cleanEmail = (ownerEmail || '').toLowerCase().trim();
@@ -634,6 +706,7 @@ export const AuthProvider = ({ children }) => {
       setAuthMode,
       login,
       register,
+      registerGymOwner,
       registerGymOwnerAuth,
       sendPhoneOtp,
       verifyOtpAndSetPassword,
