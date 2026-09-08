@@ -160,13 +160,13 @@ export const Navbar = ({ activeTab, setActiveTab }) => {
             <div className="flex items-center space-x-1.5 sm:space-x-2">
               <button
                 onClick={() => openAuthModal('login')}
-                className="px-3 sm:px-4 py-2 text-xs sm:text-sm font-semibold text-slate-200 hover:text-electricBlue transition-colors"
+                className="px-3 sm:px-4 py-2 text-xs sm:text-sm font-semibold text-slate-200 hover:text-electricBlue transition-colors cursor-pointer"
               >
                 Sign In
               </button>
               <button
-                onClick={() => openAuthModal('register')}
-                className="px-3 sm:px-4 py-2 text-xs sm:text-sm font-bold text-slate-950 bg-gradient-to-r from-electricBlue to-blue-400 hover:from-blue-400 hover:to-electricBlue rounded-xl shadow-[0_0_15px_rgba(0,240,255,0.4)] transition-all transform hover:scale-105"
+                onClick={() => setActiveTab('role_select')}
+                className="px-3 sm:px-4 py-2 text-xs sm:text-sm font-bold text-slate-950 bg-gradient-to-r from-electricBlue to-blue-400 hover:from-blue-400 hover:to-electricBlue rounded-xl shadow-[0_0_15px_rgba(0,240,255,0.4)] transition-all transform hover:scale-105 cursor-pointer"
               >
                 Get Started
               </button>

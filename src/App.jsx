@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { IntroSplash } from './components/IntroSplash';
 import { Navbar } from './components/Navbar';
 import { MasterLandingPage } from './components/MasterLandingPage';
+import { RoleSelectionPage } from './components/RoleSelectionPage';
 import { AuthModal } from './components/AuthModal';
 import { ClientDashboard } from './components/ClientDashboard';
 import { TrainerDashboard } from './components/TrainerDashboard';
@@ -75,6 +76,15 @@ const MainContent = () => {
           {activeTab === 'landing' && (
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
               <MasterLandingPage
+                onGetStarted={() => setActiveTab('role_select')}
+                onOpenLegal={openLegal}
+              />
+            </div>
+          )}
+
+          {activeTab === 'role_select' && (
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+              <RoleSelectionPage
                 onSelectEnthusiast={() => setActiveTab('home')}
                 onSelectGymOwner={() => {
                   if (currentUser?.role === 'gym_owner') {
@@ -84,7 +94,7 @@ const MainContent = () => {
                   }
                 }}
                 onOpenAuthModal={(persona, mode) => openAuthModal(mode, persona)}
-                onOpenLegal={openLegal}
+                onBackToOverview={() => setActiveTab('landing')}
               />
             </div>
           )}
@@ -119,34 +129,39 @@ const MainContent = () => {
         <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-[11px] text-slate-400 font-medium">
           <button 
             onClick={() => openLegal('privacy')} 
-            className="hover:text-electricBlue transition-colors flex items-center gap-1"
+            className="hover:text-electricBlue transition-colors flex items-center gap-1 cursor-pointer"
           >
             <ShieldCheck className="w-3.5 h-3.5" /> Privacy Policy
           </button>
 
           <button 
             onClick={() => openLegal('terms')} 
-            className="hover:text-electricBlue transition-colors flex items-center gap-1"
+            className="hover:text-electricBlue transition-colors flex items-center gap-1 cursor-pointer"
           >
             <FileText className="w-3.5 h-3.5" /> Terms & Conditions
           </button>
 
           <button 
             onClick={() => openLegal('refund')} 
-            className="hover:text-electricBlue transition-colors flex items-center gap-1"
+            className="hover:text-electricBlue transition-colors flex items-center gap-1 cursor-pointer"
           >
             <RefreshCw className="w-3.5 h-3.5" /> Cancellation & Refunds
           </button>
 
           <button 
             onClick={() => setDeleteModalOpen(true)} 
-            className="hover:text-rose-400 transition-colors flex items-center gap-1 text-slate-400"
+            className="hover:text-rose-400 transition-colors flex items-center gap-1 text-slate-400 cursor-pointer"
           >
             <Trash2 className="w-3.5 h-3.5" /> Delete Account
           </button>
         </div>
 
-        <p className="text-[11px] text-slate-600">
+        {/* Developer Attribution Credit */}
+        <div className="pt-2 text-[11px] text-slate-400 font-medium tracking-wide">
+          Developed by <span className="text-electricBlue font-bold hover:underline cursor-pointer">Snehith</span>
+        </div>
+
+        <p className="text-[10px] text-slate-600">
           © {new Date().getFullYear()} FITUP Fitness Technologies Private Limited. All rights reserved. • Google Play Store Verified
         </p>
       </footer>
