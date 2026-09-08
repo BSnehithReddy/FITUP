@@ -11,7 +11,8 @@ import {
   Upload, Scan, AlertCircle, ArrowLeft, Calendar, User, 
   RefreshCw, CreditCard, MessageSquare, HelpCircle, X,
   Shield, Check, Phone, ChevronDown, Award, CornerUpLeft,
-  Flame, Zap, Filter, Heart, Share2, Info, Compass, CheckCircle
+  Flame, Zap, Filter, Heart, Share2, Info, Compass, CheckCircle,
+  Building2, Tag, UserCheck
 } from 'lucide-react';
 
 export const ClientDashboard = ({ activeTab = 'home', setActiveTab, onOpenLegal }) => {

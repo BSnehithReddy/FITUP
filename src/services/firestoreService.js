@@ -494,7 +494,7 @@ export const firestoreService = {
     // ----------------------------------------------------
     getGymsSync() {
         const res = safeJsonParse(STORAGE_KEYS.GYMS, INITIAL_DATA.gyms);
-        return Array.isArray(res) ? res : INITIAL_DATA.gyms;
+        return (Array.isArray(res) && res.length > 0) ? res : INITIAL_DATA.gyms;
     },
 
     async getGyms() {
@@ -531,15 +531,16 @@ export const firestoreService = {
                     console.warn("Security Alert: Unauthorized pricing modification blocked.");
                 }
             }
+            gyms[existingIdx] = savedGym;
+        } else {
+            gyms.push(savedGym);
         }
         
-        if (existingIdx !== -1) gyms[existingIdx] = savedGym;
-        else gyms.push(savedGym);
         localStorage.setItem(STORAGE_KEYS.GYMS, JSON.stringify(gyms));
         emitDataSync();
 
         try {
-            await setDoc(doc(db, "gyms", savedGym.gymId), savedGym);
+            await setDoc(doc(db, "gyms", savedGym.gymId), savedGym, { merge: true });
         } catch (e) {}
         return savedGym;
     },
