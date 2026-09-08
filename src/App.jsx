@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { IntroSplash } from './components/IntroSplash';
 import { Navbar } from './components/Navbar';
+import { MasterLandingPage } from './components/MasterLandingPage';
 import { AuthModal } from './components/AuthModal';
 import { ClientDashboard } from './components/ClientDashboard';
 import { TrainerDashboard } from './components/TrainerDashboard';
@@ -14,7 +15,7 @@ import { crashlyticsService } from './services/crashlyticsService';
 import { ShieldCheck, FileText, RefreshCw, Trash2, Bug } from 'lucide-react';
 
 const MainContent = () => {
-  const { currentUser } = useAuth();
+  const { currentUser, openAuthModal } = useAuth();
   const [activeTab, setActiveTab] = useState(() => {
     const saved = localStorage.getItem("fitup_user_session");
     if (saved) {
@@ -25,7 +26,7 @@ const MainContent = () => {
         if (u?.role === 'trainer') return 'trainer_dash';
       } catch (e) {}
     }
-    return 'home';
+    return 'landing';
   });
 
   // State for Legal & Compliance Modal
@@ -47,13 +48,13 @@ const MainContent = () => {
   useEffect(() => {
     const isOwner = (currentUser?.phone === '9030118909' || currentUser?.email === 'snehith@fitup.com' || currentUser?.uid === 'usr-owner-snehith') && currentUser?.role === 'owner';
     if (activeTab === 'owner_dash' && !isOwner) {
-      setActiveTab('home');
+      setActiveTab('landing');
     }
     if (activeTab === 'gym_owner_dash' && currentUser?.role !== 'gym_owner') {
-      setActiveTab('home');
+      setActiveTab('landing');
     }
     if (activeTab === 'trainer_dash' && currentUser?.role !== 'trainer') {
-      setActiveTab('home');
+      setActiveTab('landing');
     }
   }, [currentUser, activeTab]);
 
@@ -71,6 +72,23 @@ const MainContent = () => {
       {/* Main View Router with Protective Error Boundary */}
       <main className="flex-1 pb-16">
         <ErrorBoundary>
+          {activeTab === 'landing' && (
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+              <MasterLandingPage
+                onSelectEnthusiast={() => setActiveTab('home')}
+                onSelectGymOwner={() => {
+                  if (currentUser?.role === 'gym_owner') {
+                    setActiveTab('gym_owner_dash');
+                  } else {
+                    openAuthModal('register', 'gym_owner');
+                  }
+                }}
+                onOpenAuthModal={(persona, mode) => openAuthModal(mode, persona)}
+                onOpenLegal={openLegal}
+              />
+            </div>
+          )}
+
           {(activeTab === 'home' || activeTab === 'my_bookings') && (
             <ClientDashboard activeTab={activeTab} setActiveTab={setActiveTab} onOpenLegal={openLegal} />
           )}

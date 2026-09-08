@@ -23,6 +23,7 @@ export const AuthProvider = ({ children }) => {
 
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authMode, setAuthMode] = useState("login"); // "login" | "register" | "forgot_password"
+  const [authPersona, setAuthPersona] = useState("client"); // "client" | "gym_owner"
 
   // Sync session with localStorage
   useEffect(() => {
@@ -62,9 +63,10 @@ export const AuthProvider = ({ children }) => {
     return () => unsubscribe();
   }, [currentUser]);
 
-  const openAuthModal = (mode = "login") => {
+  const openAuthModal = (mode = "login", persona = "client") => {
     soundEffects.playClick();
     setAuthMode(mode);
+    setAuthPersona(persona);
     setAuthModalOpen(true);
   };
 
@@ -701,6 +703,8 @@ export const AuthProvider = ({ children }) => {
       currentUser,
       authModalOpen,
       authMode,
+      authPersona,
+      setAuthPersona,
       openAuthModal,
       closeAuthModal,
       setAuthMode,

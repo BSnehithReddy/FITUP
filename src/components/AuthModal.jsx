@@ -12,6 +12,8 @@ export const AuthModal = ({ setActiveTab, onOpenLegal }) => {
   const { 
     authModalOpen, 
     authMode, 
+    authPersona,
+    setAuthPersona,
     closeAuthModal, 
     setAuthMode, 
     login, 
@@ -22,7 +24,13 @@ export const AuthModal = ({ setActiveTab, onOpenLegal }) => {
   } = useAuth();
   
   // Persona state: 'client' (Gym Enthusiast) | 'gym_owner' (Gym Owner)
-  const [persona, setPersona] = useState('client');
+  const [persona, setPersona] = useState(authPersona || 'client');
+
+  useEffect(() => {
+    if (authPersona) {
+      setPersona(authPersona);
+    }
+  }, [authPersona, authModalOpen]);
 
   // Client Login / Register fields
   const [identifier, setIdentifier] = useState(''); // Email or Phone for login

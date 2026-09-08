@@ -16,7 +16,7 @@ export const Navbar = ({ activeTab, setActiveTab }) => {
         
         {/* Brand Logo */}
         <div 
-          onClick={() => setActiveTab('home')}
+          onClick={() => setActiveTab('landing')}
           className="flex items-center space-x-3 cursor-pointer group"
         >
           <div className="relative w-11 h-11 flex items-center justify-center rounded-xl bg-slate-900 border border-electricBlue/30 shadow-[0_0_15px_rgba(0,240,255,0.2)] group-hover:border-electricBlue transition-all overflow-hidden p-1">
@@ -35,6 +35,18 @@ export const Navbar = ({ activeTab, setActiveTab }) => {
         {/* Navigation Tabs */}
         <nav className="flex items-center space-x-1 sm:space-x-2">
           <button
+            onClick={() => setActiveTab('landing')}
+            className={`flex items-center space-x-1.5 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all ${
+              activeTab === 'landing' 
+                ? 'bg-electricBlue/10 text-electricBlue border border-electricBlue/40 shadow-[0_0_10px_rgba(0,240,255,0.2)]' 
+                : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
+            }`}
+          >
+            <Sparkles className="w-4 h-4 text-electricBlue" />
+            <span>Home</span>
+          </button>
+
+          <button
             onClick={() => setActiveTab('home')}
             className={`flex items-center space-x-1.5 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all ${
               activeTab === 'home' 
@@ -43,7 +55,8 @@ export const Navbar = ({ activeTab, setActiveTab }) => {
             }`}
           >
             <Search className="w-4 h-4" />
-            <span>Explore Gyms</span>
+            <span className="hidden sm:inline">Explore Gyms</span>
+            <span className="sm:hidden">Gyms</span>
           </button>
 
           <button
@@ -97,7 +110,7 @@ export const Navbar = ({ activeTab, setActiveTab }) => {
               className={`flex items-center space-x-1.5 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all ${
                 activeTab === 'owner_dash' 
                   ? 'bg-electricBlue/10 text-electricBlue border border-electricBlue/40 shadow-[0_0_10px_rgba(0,240,255,0.2)]' 
-                  : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
+                : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
               }`}
             >
               <Shield className="w-4 h-4 text-electricBlue" />
