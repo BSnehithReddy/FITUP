@@ -9,7 +9,7 @@ import {
   Clock, ArrowUpRight, ShieldCheck, Sparkles, Image as ImageIcon, 
   QrCode, RefreshCw, Lock, Unlock, TrendingUp, BarChart3, 
   DollarSign, Activity, AlertTriangle, ShieldAlert, Star,
-  ShieldX, ArrowLeft, Percent, Database, Cloud
+  ShieldX, ArrowLeft, Percent, Database, Cloud, Tag, Gift, BadgeCheck
 } from 'lucide-react';
 
 const PRESET_GYM_IMAGES = [
@@ -126,6 +126,15 @@ export const OwnerDashboard = ({ setActiveTab }) => {
     ownerUpiId: localStorage.getItem('fitup_owner_upi') || '9030118909@ybl',
     ownerQrCodeUrl: '',
     razorpayKeyId: localStorage.getItem('fitup_razorpay_key') || 'rzp_test_TYwrtzZ7ROjR5s'
+  });
+
+  const [coupons, setCoupons] = useState(firestoreService.getCouponsSync());
+  const [showCouponModal, setShowCouponModal] = useState(false);
+  const [couponForm, setCouponForm] = useState({
+    code: '',
+    discountType: 'PERCENT',
+    discountValue: 50,
+    description: ''
   });
 
   const [toastMessage, setToastMessage] = useState(null);
@@ -358,15 +367,17 @@ export const OwnerDashboard = ({ setActiveTab }) => {
       return;
     }
 
+    const splitVal = Number(trainerForm.trainerSplitPercent) || 50;
     await firestoreService.saveTrainer({
       ...trainerForm,
       trainerId: editingTrainer ? editingTrainer.trainerId : null,
-      trainerSplitPercent: Number(trainerForm.trainerSplitPercent) || 50,
+      commissionPercentage: splitVal,
+      trainerSplitPercent: splitVal,
       walletBalance: editingTrainer?.walletBalance || 0
     });
 
     setShowTrainerModal(false);
-    showToast(editingTrainer ? "Trainer & 50% Split Settings Updated!" : "New Trainer Added!");
+    showToast(editingTrainer ? `Trainer & ${splitVal}% Split Settings Updated!` : "New Trainer Added!");
   };
 
   const handleDeleteTrainer = async (trainerId) => {
@@ -384,6 +395,32 @@ export const OwnerDashboard = ({ setActiveTab }) => {
       setTrainerForm({ ...trainerForm, availableTimings: current.filter(s => s !== slot) });
     } else {
       setTrainerForm({ ...trainerForm, availableTimings: [...current, slot] });
+    }
+  };
+
+  const handleSaveCoupon = async (e) => {
+    e.preventDefault();
+    soundEffects.playClick();
+    if (!couponForm.code.trim()) {
+      alert("Please enter a valid coupon code");
+      return;
+    }
+    try {
+      const code = couponForm.code.trim().toUpperCase();
+      const saved = await firestoreService.saveCoupon({
+        code,
+        discountType: couponForm.discountType,
+        discountValue: Number(couponForm.discountValue) || 0,
+        description: couponForm.description.trim() || `${code} Promotional Discount`,
+        active: true
+      });
+      const updated = firestoreService.getCouponsSync();
+      setCoupons(updated);
+      setShowCouponModal(false);
+      setCouponForm({ code: '', discountType: 'PERCENT', discountValue: 50, description: '' });
+      showToast(`Coupon ${saved.code} created & activated for ₹2,200 Onboarding!`);
+    } catch (err) {
+      alert(err.message || "Failed to save coupon");
     }
   };
 
@@ -851,12 +888,70 @@ export const OwnerDashboard = ({ setActiveTab }) => {
           <div className="md:col-span-4">
             <button
               type="submit"
-              className="w-full py-2.5 bg-emerald-500 text-slate-950 font-bold rounded-xl text-xs hover:shadow-[0_0_15px_#34d399] transition-all"
+              className="w-full py-2.5 bg-emerald-500 text-slate-950 font-bold rounded-xl text-xs hover:shadow-[0_0_15px_#34d399] transition-all cursor-pointer"
             >
               Save Gateway Configuration
             </button>
           </div>
         </form>
+      </div>
+
+      {/* ADMIN COUPON CODE MANAGEMENT SYSTEM (₹2,200 REGISTRATION FEE) */}
+      <div className="glass-panel p-6 rounded-3xl border border-emerald-500/20 space-y-4 bg-emerald-500/5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-400/40 text-emerald-400 flex items-center justify-center">
+              <Tag className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-base font-extrabold text-white font-outfit flex items-center gap-2">
+                <span>Admin Promo & Coupon Codes (₹2,200 Onboarding)</span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                  {coupons.length} Active Codes
+                </span>
+              </h3>
+              <p className="text-xs text-slate-400">
+                Discount codes applied during Gym Facility Registration to reduce or waive the ₹2,200 fee.
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={() => setShowCouponModal(true)}
+            className="px-4 py-2 bg-gradient-to-r from-emerald-400 to-teal-400 text-slate-950 font-bold rounded-xl text-xs shadow-[0_0_15px_rgba(52,211,153,0.3)] hover:scale-105 transition-all flex items-center gap-1.5 self-start sm:self-auto cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Create Coupon Code</span>
+          </button>
+        </div>
+
+        {/* Coupons Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-2">
+          {coupons.map((coupon, idx) => (
+            <div 
+              key={idx}
+              className="p-3.5 rounded-2xl bg-slate-900/90 border border-white/10 hover:border-emerald-400/40 transition-all flex items-center justify-between"
+            >
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-0.5 rounded-lg bg-emerald-500/20 text-emerald-400 font-mono font-black text-xs border border-emerald-400/30">
+                    {coupon.code}
+                  </span>
+                  <span className="text-xs font-bold text-white">
+                    {coupon.discountType === 'PERCENT' ? `${coupon.discountValue}% OFF` : `₹${coupon.discountValue} FLAT OFF`}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400 leading-tight">
+                  {coupon.description}
+                </p>
+              </div>
+
+              <div className="text-right">
+                <span className="text-[10px] text-emerald-400 font-mono block">ACTIVE</span>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* CLOUD FIRESTORE DATABASE & INFRASTRUCTURE STATUS */}
@@ -1231,6 +1326,109 @@ export const OwnerDashboard = ({ setActiveTab }) => {
                   className="px-6 py-2.5 bg-vibrantOrange text-slate-950 font-bold rounded-xl shadow-[0_0_15px_#ff5500]"
                 >
                   Save Trainer Pro
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* CREATE NEW ADMIN COUPON MODAL */}
+      {showCouponModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-slate-900 border border-emerald-500/30 rounded-3xl p-6 max-w-md w-full shadow-2xl relative">
+            <div className="flex justify-between items-center mb-4">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                  <Tag className="w-4 h-4" />
+                </div>
+                <h3 className="text-lg font-bold text-white font-outfit">Create Gym Onboarding Coupon</h3>
+              </div>
+              <button 
+                onClick={() => setShowCouponModal(false)} 
+                className="text-slate-400 hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveCoupon} className="space-y-4 text-xs">
+              <div>
+                <label className="text-slate-300 font-bold block mb-1">Coupon Code (Uppercase)</label>
+                <input
+                  type="text"
+                  required
+                  value={couponForm.code}
+                  onChange={(e) => setCouponForm({ ...couponForm, code: e.target.value.toUpperCase() })}
+                  placeholder="e.g. SPECIAL80, PROMO100"
+                  className="w-full bg-slate-950 border border-white/10 rounded-xl px-4 py-2.5 text-white font-mono uppercase focus:border-emerald-400"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-slate-300 font-bold block mb-1">Discount Type</label>
+                  <select
+                    value={couponForm.discountType}
+                    onChange={(e) => setCouponForm({ ...couponForm, discountType: e.target.value })}
+                    className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2.5 text-white focus:border-emerald-400"
+                  >
+                    <option value="PERCENT">Percentage (%)</option>
+                    <option value="FLAT">Flat Amount (₹)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-slate-300 font-bold block mb-1">
+                    {couponForm.discountType === 'PERCENT' ? 'Percentage Cut (0-100)' : 'Flat Discount (₹)'}
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max={couponForm.discountType === 'PERCENT' ? 100 : 2200}
+                    required
+                    value={couponForm.discountValue}
+                    onChange={(e) => setCouponForm({ ...couponForm, discountValue: e.target.value })}
+                    placeholder={couponForm.discountType === 'PERCENT' ? '50' : '500'}
+                    className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2.5 text-white focus:border-emerald-400 font-mono"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-slate-300 font-bold block mb-1">Description / Campaign Name</label>
+                <input
+                  type="text"
+                  value={couponForm.description}
+                  onChange={(e) => setCouponForm({ ...couponForm, description: e.target.value })}
+                  placeholder="e.g. Hyderabad Launch Special • 50% Off"
+                  className="w-full bg-slate-950 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:border-emerald-400"
+                />
+              </div>
+
+              <div className="p-3 rounded-xl bg-slate-950 border border-white/5 space-y-1">
+                <span className="text-[10px] text-slate-400">Calculated Gym Payable Amount:</span>
+                <div className="text-sm font-black text-emerald-400 font-mono">
+                  {couponForm.discountType === 'PERCENT'
+                    ? `₹${Math.max(0, 2200 - Math.round((2200 * (Number(couponForm.discountValue) || 0)) / 100))} (from ₹2,200)`
+                    : `₹${Math.max(0, 2200 - (Number(couponForm.discountValue) || 0))} (from ₹2,200)`}
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowCouponModal(false)}
+                  className="px-4 py-2 text-slate-400 hover:text-white cursor-pointer"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  className="px-6 py-2.5 bg-gradient-to-r from-emerald-400 to-teal-400 text-slate-950 font-bold rounded-xl shadow-[0_0_15px_rgba(52,211,153,0.4)] cursor-pointer"
+                >
+                  Activate Coupon Code
                 </button>
               </div>
             </form>

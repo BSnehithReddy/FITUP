@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { soundEffects } from '../services/soundEffects';
+import { firestoreService } from '../services/firestoreService';
+import { razorpayService } from '../services/razorpayService';
 import { 
   Eye, EyeOff, Lock, Phone, Mail, User, X, 
   ShieldCheck, AlertCircle, CheckCircle2, ArrowLeft, 
   KeyRound, MessageSquareCode, Sparkles, RefreshCw,
-  Building2, Dumbbell, MapPin
+  Building2, Dumbbell, MapPin, Tag, Percent, Check, 
+  CreditCard, BadgeCheck
 } from 'lucide-react';
 
 export const AuthModal = ({ setActiveTab, onOpenLegal }) => {
@@ -42,7 +45,7 @@ export const AuthModal = ({ setActiveTab, onOpenLegal }) => {
   const [phone, setPhone] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
-  // Gym Owner specific registration fields
+  // Gym Owner specific registration fields (₹2,200 Onboarding Fee + Coupon)
   const [ownerName, setOwnerName] = useState('');
   const [gymName, setGymName] = useState('');
   const [location, setLocation] = useState('');
@@ -51,6 +54,12 @@ export const AuthModal = ({ setActiveTab, onOpenLegal }) => {
   const [ownerPassword, setOwnerPassword] = useState('');
   const [ownerConfirmPassword, setOwnerConfirmPassword] = useState('');
   const [showOwnerPassword, setShowOwnerPassword] = useState(false);
+
+  // Gym Registration Coupon states
+  const [couponInput, setCouponInput] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState(null);
+  const [couponError, setCouponError] = useState('');
+  const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
 
   // Forgot Password states
   const [resetMode, setResetMode] = useState('phone'); // 'phone' | 'email'
@@ -65,7 +74,6 @@ export const AuthModal = ({ setActiveTab, onOpenLegal }) => {
   const [fallbackOtp, setFallbackOtp] = useState('');
   const [verifiedPhone, setVerifiedPhone] = useState('');
   const [countdown, setCountdown] = useState(0);
-
 
   // Shared UI states
   const [errorMessage, setErrorMessage] = useState('');
@@ -86,6 +94,40 @@ export const AuthModal = ({ setActiveTab, onOpenLegal }) => {
   const resetFormState = () => {
     setErrorMessage('');
     setSuccessMessage('');
+    setCouponError('');
+  };
+
+  const handleApplyCoupon = async (e) => {
+    if (e) e.preventDefault();
+    soundEffects.playClick();
+    setCouponError('');
+    if (!couponInput.trim()) {
+      setCouponError('Please enter a coupon code.');
+      return;
+    }
+    setIsApplyingCoupon(true);
+    try {
+      const res = await firestoreService.validateCoupon(couponInput.trim(), 2200);
+      if (res.valid) {
+        setAppliedCoupon(res);
+        setSuccessMessage(res.message);
+        soundEffects.playSuccessChime();
+      } else {
+        setCouponError(res.message || 'Invalid or expired coupon code.');
+        soundEffects.playError();
+      }
+    } catch (err) {
+      setCouponError(err.message || 'Failed to validate coupon code.');
+    } finally {
+      setIsApplyingCoupon(false);
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    soundEffects.playClick();
+    setAppliedCoupon(null);
+    setCouponInput('');
+    setCouponError('');
   };
 
   const handleOpenForgotPassword = () => {
@@ -396,23 +438,73 @@ export const AuthModal = ({ setActiveTab, onOpenLegal }) => {
           return;
         }
 
-        setLoading(true);
-        try {
-          const res = await registerGymOwner(
-            ownerName.trim(),
-            gymName.trim(),
-            location.trim(),
-            cleanOwnerPhone,
-            ownerEmail.trim(),
-            ownerPassword
-          );
-          
-          setActiveTab('gym_owner_dash');
-        } catch (err) {
-          setErrorMessage(err.message || 'Gym registration failed. Please try again.');
-        } finally {
-          setLoading(false);
+        // Calculate final payable onboarding fee (Standard ₹2,200 with coupon discount)
+        const payableAmount = appliedCoupon ? appliedCoupon.finalAmount : 2200;
+
+        // Function that saves to database ONLY after payment verification
+        const executeGymPersistence = async (paymentData) => {
+          try {
+            setLoading(true);
+            const res = await registerGymOwner(
+              ownerName.trim(),
+              gymName.trim(),
+              location.trim(),
+              cleanOwnerPhone,
+              ownerEmail.trim(),
+              ownerPassword,
+              '',
+              paymentData
+            );
+            setActiveTab('gym_owner_dash');
+          } catch (err) {
+            setErrorMessage(err.message || 'Gym registration failed. Please try again.');
+          } finally {
+            setLoading(false);
+          }
+        };
+
+        // Scenario 1: 100% Fee Waived via Admin Coupon (₹0 payable)
+        if (payableAmount === 0) {
+          await executeGymPersistence({
+            feePaid: true,
+            amountPaid: 0,
+            discountApplied: 2200,
+            couponCode: appliedCoupon?.code || 'PROMO100',
+            paymentId: `coupon_${appliedCoupon?.code || 'PROMO'}_${Date.now()}`
+          });
+          return;
         }
+
+        // Scenario 2: Mandatory Razorpay Payment (₹2,200 standard or discounted)
+        setLoading(true);
+        razorpayService.openGymRegistrationCheckout({
+          amount: payableAmount,
+          gymName: gymName.trim(),
+          ownerName: ownerName.trim(),
+          ownerPhone: cleanOwnerPhone,
+          ownerEmail: ownerEmail.trim(),
+          couponCode: appliedCoupon?.code || null,
+          onSuccess: async (rzpRes) => {
+            soundEffects.playSuccessChime();
+            await executeGymPersistence({
+              feePaid: true,
+              amountPaid: payableAmount,
+              discountApplied: Math.max(0, 2200 - payableAmount),
+              couponCode: appliedCoupon?.code || null,
+              paymentId: rzpRes.paymentId,
+              orderId: rzpRes.orderId,
+              signature: rzpRes.signature
+            });
+          },
+          onFailure: (err) => {
+            setLoading(false);
+            soundEffects.playError();
+            setErrorMessage(err.message || 'Onboarding fee payment was not completed. Account was not created.');
+          },
+          onDismiss: () => {
+            setLoading(false);
+          }
+        });
         return;
       }
 
@@ -1228,6 +1320,119 @@ export const AuthModal = ({ setActiveTab, onOpenLegal }) => {
                             </div>
                           </div>
                         </div>
+
+                        {/* ======================================================= */}
+                        {/* MANDATORY PARTNER ONBOARDING FEE & COUPON CODE SYSTEM */}
+                        {/* ======================================================= */}
+                        <div className="pt-2 space-y-3">
+                          
+                          {/* Fee Breakdown Card */}
+                          <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-emerald-500/30 space-y-2.5">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <div className="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                                  <Building2 className="w-4 h-4" />
+                                </div>
+                                <div>
+                                  <h4 className="text-xs font-bold text-white">Lifetime Partner Facility Onboarding</h4>
+                                  <p className="text-[10px] text-slate-400">One-time registration & verification fee</p>
+                                </div>
+                              </div>
+
+                              <div className="text-right">
+                                {appliedCoupon ? (
+                                  <div>
+                                    <span className="text-[11px] text-slate-500 line-through mr-1.5">₹2,200</span>
+                                    <span className="text-sm font-black text-emerald-400 font-mono">
+                                      ₹{appliedCoupon.finalAmount}
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <span className="text-sm font-black text-white font-mono">₹2,200</span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Trust badges */}
+                            <div className="flex flex-wrap items-center gap-2 text-[10px] text-slate-300 pt-1 border-t border-white/5">
+                              <span className="flex items-center gap-1 text-emerald-400 font-medium">
+                                <CheckCircle2 className="w-3 h-3" /> 30% Revenue Share
+                              </span>
+                              <span>•</span>
+                              <span>Unlimited Trainers</span>
+                              <span>•</span>
+                              <span>24-48h UPI Payouts</span>
+                            </div>
+                          </div>
+
+                          {/* Coupon Code Input & Application */}
+                          <div>
+                            <label className="block text-[11px] font-medium text-slate-300 mb-1 flex items-center justify-between">
+                              <span className="flex items-center gap-1">
+                                <Tag className="w-3 h-3 text-emerald-400" /> Have an Admin Coupon Code? (Optional)
+                              </span>
+                              {appliedCoupon && (
+                                <button
+                                  type="button"
+                                  onClick={handleRemoveCoupon}
+                                  className="text-[10px] text-rose-400 hover:underline cursor-pointer"
+                                >
+                                  Remove Code
+                                </button>
+                              )}
+                            </label>
+
+                            {!appliedCoupon ? (
+                              <div className="flex gap-2">
+                                <div className="relative flex-1">
+                                  <Tag className="absolute left-3 top-2.5 w-3.5 h-3.5 text-slate-500" />
+                                  <input
+                                    type="text"
+                                    value={couponInput}
+                                    onChange={(e) => {
+                                      setCouponInput(e.target.value.toUpperCase());
+                                      setCouponError('');
+                                    }}
+                                    placeholder="e.g. FITUP100, WELCOME50, LAUNCH500"
+                                    className="w-full bg-slate-950 border border-white/10 rounded-xl pl-9 pr-3 py-2 text-xs text-white uppercase placeholder-slate-600 focus:outline-none focus:border-emerald-400 font-mono"
+                                  />
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={handleApplyCoupon}
+                                  disabled={isApplyingCoupon || !couponInput.trim()}
+                                  className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-xl text-xs transition-all disabled:opacity-40 flex items-center gap-1 cursor-pointer"
+                                >
+                                  {isApplyingCoupon ? (
+                                    <span className="w-3.5 h-3.5 border-2 border-slate-950 border-t-transparent rounded-full animate-spin"></span>
+                                  ) : (
+                                    <span>Apply</span>
+                                  )}
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-400/30 flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <BadgeCheck className="w-4 h-4 text-emerald-400" />
+                                  <div>
+                                    <span className="text-xs font-bold text-emerald-300 font-mono mr-1.5">{appliedCoupon.code}</span>
+                                    <span className="text-[10px] text-slate-300">{appliedCoupon.description}</span>
+                                  </div>
+                                </div>
+                                <span className="text-xs font-bold text-emerald-400 font-mono">
+                                  -₹{appliedCoupon.discountAmount}
+                                </span>
+                              </div>
+                            )}
+
+                            {couponError && (
+                              <span className="text-[10px] text-red-400 mt-1 block">
+                                {couponError}
+                              </span>
+                            )}
+                          </div>
+
+                        </div>
                       </>
                     )}
 
@@ -1293,8 +1498,8 @@ export const AuthModal = ({ setActiveTab, onOpenLegal }) => {
                   disabled={loading}
                   className={`w-full py-3.5 px-4 font-bold rounded-xl transition-all transform active:scale-95 disabled:opacity-50 mt-2 text-sm flex items-center justify-center space-x-2 text-slate-950 ${
                     persona === 'gym_owner'
-                      ? 'bg-gradient-to-r from-emerald-400 via-teal-400 to-emerald-500 hover:from-emerald-300 hover:to-teal-300 shadow-[0_0_20px_rgba(52,211,153,0.4)]'
-                      : 'bg-gradient-to-r from-electricBlue via-blue-500 to-vibrantOrange hover:from-blue-400 hover:to-electricBlue shadow-[0_0_20px_rgba(0,240,255,0.4)]'
+                      ? 'bg-gradient-to-r from-emerald-400 via-teal-400 to-emerald-500 hover:from-emerald-300 hover:to-teal-300 shadow-[0_0_20px_rgba(52,211,153,0.4)] cursor-pointer'
+                      : 'bg-gradient-to-r from-electricBlue via-blue-500 to-vibrantOrange hover:from-blue-400 hover:to-electricBlue shadow-[0_0_20px_rgba(0,240,255,0.4)] cursor-pointer'
                   }`}
                 >
                   {loading ? (
@@ -1305,7 +1510,11 @@ export const AuthModal = ({ setActiveTab, onOpenLegal }) => {
                   ) : authMode === 'login' ? (
                     persona === 'gym_owner' ? 'Sign In to Gym Portal' : 'Sign In to FITUP'
                   ) : (
-                    persona === 'gym_owner' ? 'Register Facility & Launch' : 'Create FITUP Account'
+                    persona === 'gym_owner' 
+                      ? (appliedCoupon && appliedCoupon.finalAmount === 0 
+                          ? 'Register Facility (Fee Waived • ₹0)' 
+                          : `Pay ₹${appliedCoupon ? appliedCoupon.finalAmount : 2200} & Register Facility`)
+                      : 'Create FITUP Account'
                   )}
                 </button>
 

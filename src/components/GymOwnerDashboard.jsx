@@ -218,6 +218,7 @@ export const GymOwnerDashboard = () => {
         password: "Trainer@123",
         upiId: `${cleanPhone}@upi`,
         walletBalance: 0,
+        commissionPercentage: Number(trainerSplitPercent) || 50,
         trainerSplitPercent: Number(trainerSplitPercent) || 50,
         specialization: trainerSpecialization.trim(),
         experience: trainerExperience.trim(),

@@ -195,6 +195,120 @@ class RazorpayService {
       if (onFailure) onFailure(err);
     });
   }
+
+  /**
+   * Dedicated Onboarding Checkout for Gym Partner Registration (₹2,200 Fee with Coupon Support)
+   */
+  openGymRegistrationCheckout({
+    amount = 2200,
+    gymName = 'Partner Fitness Facility',
+    ownerName = 'Gym Owner',
+    ownerPhone = '',
+    ownerEmail = '',
+    couponCode = null,
+    onSuccess,
+    onFailure,
+    onDismiss
+  }) {
+    const activeKey = this.getActiveKeyId();
+    const amountInRupees = Number(amount) || 2200;
+    const amountInPaise = Math.max(100, Math.round(amountInRupees * 100));
+
+    // Ensure Razorpay SDK is loaded
+    if (!window.Razorpay) {
+      console.warn('Razorpay SDK not yet loaded in window. Injecting script...');
+      const script = document.createElement('script');
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.onload = () => {
+        this.openGymRegistrationCheckout({ amount, gymName, ownerName, ownerPhone, ownerEmail, couponCode, onSuccess, onFailure, onDismiss });
+      };
+      script.onerror = () => {
+        if (onFailure) onFailure(new Error('Failed to load Razorpay Checkout SDK'));
+      };
+      document.head.appendChild(script);
+      return;
+    }
+
+    this.createOrder({
+      amount: amountInRupees,
+      currency: 'INR',
+      receipt: `rcpt_gym_reg_${Date.now()}`,
+      notes: {
+        registrationType: 'Gym Partner Facility Onboarding',
+        gymName,
+        ownerName,
+        ownerPhone,
+        ownerEmail,
+        couponCode: couponCode || 'NONE'
+      }
+    }).then((orderData) => {
+      const options = {
+        key: activeKey,
+        amount: orderData.amount || amountInPaise,
+        currency: orderData.currency || 'INR',
+        name: 'FITUP Partner Network',
+        description: `Gym Registration Fee (₹${amountInRupees}) • ${gymName}`,
+        image: 'assets/fitup-logo.png',
+        order_id: orderData.order_id?.startsWith('order_fitup_') ? undefined : orderData.order_id,
+        prefill: {
+          name: ownerName || 'Gym Owner',
+          contact: ownerPhone || '9030118909',
+          email: ownerEmail || 'partner@fitup.app'
+        },
+        notes: {
+          gym: gymName,
+          owner: ownerName,
+          coupon: couponCode || 'NONE',
+          type: 'Partner Facility Onboarding'
+        },
+        theme: {
+          color: '#10b981' // Emerald brand theme for Gym Partner registration
+        },
+        modal: {
+          ondismiss: function () {
+            console.log('Razorpay gym registration modal dismissed by user');
+            if (onDismiss) onDismiss();
+          }
+        },
+        handler: async (response) => {
+          console.log('Razorpay gym registration success response:', response);
+          const verification = await this.verifyPayment({
+            order_id: response.razorpay_order_id || orderData.order_id,
+            razorpay_payment_id: response.razorpay_payment_id,
+            razorpay_signature: response.razorpay_signature
+          });
+
+          if (verification.verified && onSuccess) {
+            onSuccess({
+              paymentId: response.razorpay_payment_id,
+              orderId: response.razorpay_order_id || orderData.order_id,
+              signature: response.razorpay_signature,
+              amountPaid: amountInRupees
+            });
+          } else if (onFailure) {
+            onFailure(new Error(verification.error || 'Registration payment verification failed'));
+          }
+        }
+      };
+
+      try {
+        const rzp = new window.Razorpay(options);
+        rzp.on('payment.failed', function (resp) {
+          console.error('Gym registration payment failed:', resp.error);
+          if (onFailure) {
+            onFailure(new Error(resp.error?.description || 'Registration Payment Failed'));
+          }
+        });
+        rzp.open();
+      } catch (err) {
+        console.error('Error opening Razorpay modal for gym registration:', err);
+        if (onFailure) onFailure(err);
+      }
+    }).catch((err) => {
+      console.error('Failed to create Razorpay gym registration order:', err);
+      if (onFailure) onFailure(err);
+    });
+  }
 }
 
 export const razorpayService = new RazorpayService();

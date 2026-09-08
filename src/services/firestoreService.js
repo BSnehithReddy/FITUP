@@ -264,6 +264,43 @@ const INITIAL_DATA = {
         }
     ],
     payoutRequests: [],
+    coupons: [
+        {
+            code: "FITUP100",
+            discountType: "PERCENT",
+            discountValue: 100,
+            description: "Promotional Launch: 100% Off Gym Onboarding Fee (₹0)",
+            active: true
+        },
+        {
+            code: "SNEHITHFREE",
+            discountType: "PERCENT",
+            discountValue: 100,
+            description: "Super Admin Waiver: 100% Off (₹0)",
+            active: true
+        },
+        {
+            code: "WELCOME50",
+            discountType: "PERCENT",
+            discountValue: 50,
+            description: "Early Partner: 50% Off Onboarding (Pay ₹1,100)",
+            active: true
+        },
+        {
+            code: "LAUNCH500",
+            discountType: "FLAT",
+            discountValue: 500,
+            description: "Launch Partner Discount: Flat ₹500 Off (Pay ₹1,700)",
+            active: true
+        },
+        {
+            code: "PARTNER1000",
+            discountType: "FLAT",
+            discountValue: 1000,
+            description: "Hyderabad Partner Incentive: Flat ₹1,000 Off (Pay ₹1,200)",
+            active: true
+        }
+    ],
     users: [
         {
             uid: "usr-owner-snehith",
@@ -271,6 +308,7 @@ const INITIAL_DATA = {
             phone: "9030118909",
             email: "snehith@fitup.com",
             role: "owner",
+            walletBalance: 0,
             createdAt: "2026-08-01T00:00:00.000Z",
             lastLogin: new Date().toISOString()
         }
@@ -285,6 +323,7 @@ const STORAGE_KEYS = {
     REVIEWS: "fitup_reviews",
     PAYOUT_REQUESTS: "fitup_payout_requests",
     REGISTERED_CLIENTS: "fitup_registered_clients",
+    COUPONS: "fitup_coupons",
     USERS: "fitup_users"
 };
 
@@ -317,6 +356,9 @@ const initLocalStore = () => {
     }
     if (!localStorage.getItem(STORAGE_KEYS.PAYOUT_REQUESTS)) {
         localStorage.setItem(STORAGE_KEYS.PAYOUT_REQUESTS, JSON.stringify(INITIAL_DATA.payoutRequests));
+    }
+    if (!localStorage.getItem(STORAGE_KEYS.COUPONS)) {
+        localStorage.setItem(STORAGE_KEYS.COUPONS, JSON.stringify(INITIAL_DATA.coupons));
     }
     if (!localStorage.getItem(STORAGE_KEYS.USERS)) {
         localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(INITIAL_DATA.users));
@@ -596,7 +638,19 @@ export const firestoreService = {
             savedTrainer.trainerId = 'tr-' + Date.now();
             if (savedTrainer.walletBalance === undefined) savedTrainer.walletBalance = 0;
             if (savedTrainer.rating === undefined) savedTrainer.rating = 5.0;
-            if (savedTrainer.trainerSplitPercent === undefined) savedTrainer.trainerSplitPercent = 50;
+        }
+
+        // Keep commissionPercentage and trainerSplitPercent in sync (default 50%)
+        if (savedTrainer.commissionPercentage === undefined && savedTrainer.trainerSplitPercent !== undefined) {
+            savedTrainer.commissionPercentage = Number(savedTrainer.trainerSplitPercent);
+        } else if (savedTrainer.trainerSplitPercent === undefined && savedTrainer.commissionPercentage !== undefined) {
+            savedTrainer.trainerSplitPercent = Number(savedTrainer.commissionPercentage);
+        } else if (savedTrainer.commissionPercentage === undefined && savedTrainer.trainerSplitPercent === undefined) {
+            savedTrainer.commissionPercentage = 50;
+            savedTrainer.trainerSplitPercent = 50;
+        } else {
+            savedTrainer.commissionPercentage = Number(savedTrainer.commissionPercentage);
+            savedTrainer.trainerSplitPercent = Number(savedTrainer.trainerSplitPercent);
         }
 
         const trainers = this.getTrainersSync();
@@ -629,7 +683,7 @@ export const firestoreService = {
     },
 
     // ----------------------------------------------------
-    // 20 / 30 / 50 REVENUE DISTRIBUTION ENGINE
+    // DYNAMIC 3-WAY REVENUE SPLITTING ENGINE (ADMIN 20%, 80% DYNAMIC SPLIT)
     // ----------------------------------------------------
     getBookingsSync() {
         const res = safeJsonParse(STORAGE_KEYS.BOOKINGS, INITIAL_DATA.bookings);
@@ -645,74 +699,159 @@ export const firestoreService = {
         const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=PASS-${bookingId}-${encodeURIComponent(bookingData.gymName || 'FITUP')}`;
         const totalAmount = Number(bookingData.amount) || 280;
 
-        // Retrieve Gym and Trainer configuration for split calculations
-        const gyms = this.getGymsSync();
-        const gymIndex = gyms.findIndex(g => g.gymId === bookingData.gymId);
-        const gym = gymIndex !== -1 ? gyms[gymIndex] : null;
+        // =========================================================================
+        // 1. AUTOMATED 20% ADMIN PLATFORM FEE
+        // =========================================================================
+        // 100% of user payment lands in master admin gateway. 20% is credited as platform fee.
+        const adminPercent = 20;
+        const adminFee = Math.round((totalAmount * adminPercent) / 100);
+        const remainingPool = totalAmount - adminFee; // 80% Remaining Pool
+
+        // =========================================================================
+        // 2. DYNAMIC 80% SPLIT (GYM OWNER & TRAINER)
+        // =========================================================================
+        // Dynamically fetch live trainer document from Firestore at the time of payment
+        let liveTrainer = null;
+        if (bookingData.trainerId && bookingData.trainerId !== 'tr-general') {
+            try {
+                const trainerSnap = await getDoc(doc(db, "trainers", bookingData.trainerId));
+                if (trainerSnap.exists()) {
+                    liveTrainer = { ...trainerSnap.data(), trainerId: trainerSnap.id };
+                }
+            } catch (e) {
+                console.warn("Live trainer doc fetch notice, using synced record:", e.message);
+            }
+        }
 
         const trainers = this.getTrainersSync();
         const trainerIndex = trainers.findIndex(t => t.trainerId === bookingData.trainerId);
-        const trainer = trainerIndex !== -1 ? trainers[trainerIndex] : null;
+        const localTrainer = trainerIndex !== -1 ? trainers[trainerIndex] : null;
+        const activeTrainer = liveTrainer || localTrainer;
 
-        // Determine percentage splits (Defaults: Gym 30%, Trainer 50%, Platform 20%)
-        const gymPercent = (gym && typeof gym.gymSplitPercent === 'number') ? gym.gymSplitPercent : 30;
-        const trainerPercent = (trainer && typeof trainer.trainerSplitPercent === 'number') ? trainer.trainerSplitPercent : 50;
-        const platformPercent = Math.max(0, 100 - gymPercent - trainerPercent);
+        // Fetch dynamic trainer commission percentage (default 50% of the 80% pool)
+        const rawCommission = activeTrainer?.commissionPercentage ?? activeTrainer?.trainerSplitPercent;
+        const trainerCommissionPercentage = (typeof rawCommission === 'number' && rawCommission >= 0 && rawCommission <= 100)
+            ? rawCommission
+            : 50;
 
-        const trainerShare = Math.round((totalAmount * trainerPercent) / 100);
-        const gymShare = Math.round((totalAmount * gymPercent) / 100);
-        const platformShare = totalAmount - trainerShare - gymShare;
+        // Calculate Trainer Share from the 80% pool
+        const trainerShare = Math.round((remainingPool * trainerCommissionPercentage) / 100);
+        // Gym Owner gets the remaining share from the 80% pool
+        const gymOwnerShare = remainingPool - trainerShare;
 
+        // Fetch Gym details
+        let liveGym = null;
+        if (bookingData.gymId) {
+            try {
+                const gymSnap = await getDoc(doc(db, "gyms", bookingData.gymId));
+                if (gymSnap.exists()) {
+                    liveGym = { ...gymSnap.data(), gymId: gymSnap.id };
+                }
+            } catch (e) {}
+        }
+
+        const gyms = this.getGymsSync();
+        const gymIndex = gyms.findIndex(g => g.gymId === bookingData.gymId);
+        const localGym = gymIndex !== -1 ? gyms[gymIndex] : null;
+        const activeGym = liveGym || localGym;
+
+        // =========================================================================
+        // 3. TRANSACTION AUDIT TRAIL & BOOKING RECORD
+        // =========================================================================
         let newBooking = {
             ...bookingData,
             bookingId,
             qrCodeUrl,
+            totalAmount,
             amount: totalAmount,
+            adminFee,
+            platformShare: adminFee,
+            adminPercent,
+            remainingPool,
+            trainerCommissionPercentage,
+            trainerPercent: trainerCommissionPercentage,
             trainerShare,
-            gymShare,
-            platformShare,
-            trainerPercent,
-            gymPercent,
-            platformPercent,
-            gymOwnerName: gym?.ownerName || "Gym Partner",
-            gymOwnerPhone: gym?.ownerPhone || "",
+            gymOwnerShare,
+            gymShare: gymOwnerShare,
+            gymOwnerName: activeGym?.ownerName || "Gym Partner",
+            gymOwnerPhone: activeGym?.ownerPhone || "",
+            revenueSplit: {
+                totalAmount,
+                adminFee,
+                adminPercent,
+                remainingPool,
+                trainerCommissionPercentage,
+                trainerShare,
+                gymOwnerShare,
+                calculatedAt: new Date().toISOString(),
+                payoutStatus: "ESCROW_SETTLED"
+            },
             createdAt: new Date().toISOString(),
-            status: "VERIFIED",
+            status: "CONFIRMED",
+            paymentStatus: "PAID",
             paymentMethod: bookingData.paymentMethod || "RAZORPAY",
             paymentId: bookingData.paymentId || bookingData.txnId || ('pay_rzp_' + Date.now())
         };
 
+        // Save booking in local state
         const bookings = this.getBookingsSync();
         bookings.unshift(newBooking);
         localStorage.setItem(STORAGE_KEYS.BOOKINGS, JSON.stringify(bookings));
 
-        // Credit 50% (or custom) to Trainer Digital Wallet
+        // =========================================================================
+        // 4. AUTOMATIC WALLET CREDITING IN FIRESTORE
+        // =========================================================================
+
+        // A. Credit 20% Platform Fee to Master Admin Wallet
+        await this.creditAdminWallet(adminFee, "SLOT_BOOKING_20_PERCENT_FEE", {
+            bookingId,
+            gymId: bookingData.gymId,
+            gymName: bookingData.gymName,
+            trainerId: bookingData.trainerId,
+            totalAmount
+        });
+
+        // B. Credit Dynamic Trainer Share to Trainer Wallet
         if (trainerIndex !== -1) {
             trainers[trainerIndex].walletBalance = (trainers[trainerIndex].walletBalance || 0) + trainerShare;
             localStorage.setItem(STORAGE_KEYS.TRAINERS, JSON.stringify(trainers));
+        }
+        if (bookingData.trainerId && bookingData.trainerId !== 'tr-general') {
             try {
-                await updateDoc(doc(db, "trainers", trainers[trainerIndex].trainerId), { 
-                    walletBalance: trainers[trainerIndex].walletBalance 
-                });
+                const trRef = doc(db, "trainers", bookingData.trainerId);
+                const trSnap = await getDoc(trRef);
+                const curTrBal = trSnap.exists() ? (trSnap.data().walletBalance || 0) : (trainers[trainerIndex]?.walletBalance || 0);
+                await setDoc(trRef, { 
+                    walletBalance: curTrBal + trainerShare,
+                    lastBookingCreditedAt: new Date().toISOString()
+                }, { merge: true });
             } catch (e) {}
         }
 
-        // Credit 30% (or custom) to Gym Owner Digital Wallet
+        // C. Credit Gym Owner Remaining Share to Gym Wallet
         if (gymIndex !== -1) {
-            gyms[gymIndex].walletBalance = (gyms[gymIndex].walletBalance || 0) + gymShare;
+            gyms[gymIndex].walletBalance = (gyms[gymIndex].walletBalance || 0) + gymOwnerShare;
             localStorage.setItem(STORAGE_KEYS.GYMS, JSON.stringify(gyms));
+        }
+        if (bookingData.gymId) {
             try {
-                await updateDoc(doc(db, "gyms", gyms[gymIndex].gymId), { 
-                    walletBalance: gyms[gymIndex].walletBalance 
-                });
+                const gymRef = doc(db, "gyms", bookingData.gymId);
+                const gymSnap = await getDoc(gymRef);
+                const curGymBal = gymSnap.exists() ? (gymSnap.data().walletBalance || 0) : (gyms[gymIndex]?.walletBalance || 0);
+                await setDoc(gymRef, { 
+                    walletBalance: curGymBal + gymOwnerShare,
+                    lastBookingCreditedAt: new Date().toISOString()
+                }, { merge: true });
             } catch (e) {}
         }
 
         emitDataSync();
 
+        // Persist booking audit record in Firestore
         try {
             await setDoc(doc(db, "bookings", newBooking.bookingId), newBooking);
         } catch (e) {}
+
         return newBooking;
     },
 
@@ -1214,6 +1353,174 @@ export const firestoreService = {
             console.error("syncAllToCloud error:", err);
             throw err;
         }
+    },
+
+    // ----------------------------------------------------
+    // ADMIN COUPON CODE MANAGEMENT SYSTEM (₹2,200 REGISTRATION FEE)
+    // ----------------------------------------------------
+    getCouponsSync() {
+        const res = safeJsonParse(STORAGE_KEYS.COUPONS, INITIAL_DATA.coupons);
+        return Array.isArray(res) ? res : INITIAL_DATA.coupons;
+    },
+
+    async getCoupons() {
+        try {
+            const snap = await getDocs(collection(db, "coupons"));
+            const firestoreCoupons = [];
+            snap.forEach(doc => firestoreCoupons.push({ ...doc.data(), code: doc.id }));
+            if (firestoreCoupons.length > 0) {
+                localStorage.setItem(STORAGE_KEYS.COUPONS, JSON.stringify(firestoreCoupons));
+                return firestoreCoupons;
+            }
+        } catch (e) {}
+        return this.getCouponsSync();
+    },
+
+    validateCouponSync(couponCode, baseAmount = 2200) {
+        if (!couponCode || typeof couponCode !== 'string') {
+            return { valid: false, message: "Please enter a coupon code." };
+        }
+        const cleanCode = couponCode.trim().toUpperCase();
+        const coupons = this.getCouponsSync();
+        const coupon = coupons.find(c => c.code.toUpperCase() === cleanCode && c.active !== false);
+
+        if (!coupon) {
+            return { 
+                valid: false, 
+                message: `Invalid or expired coupon code '${cleanCode}'. Try FITUP100 or WELCOME50.` 
+            };
+        }
+
+        let discountAmount = 0;
+        if (coupon.discountType === "PERCENT") {
+            discountAmount = Math.round((baseAmount * (coupon.discountValue || 0)) / 100);
+        } else {
+            discountAmount = Math.min(baseAmount, Number(coupon.discountValue) || 0);
+        }
+
+        const finalAmount = Math.max(0, baseAmount - discountAmount);
+
+        return {
+            valid: true,
+            code: coupon.code,
+            discountType: coupon.discountType,
+            discountValue: coupon.discountValue,
+            discountAmount,
+            baseAmount,
+            finalAmount,
+            description: coupon.description,
+            message: discountAmount >= baseAmount 
+                ? `100% Discount Applied! Total payable: ₹0` 
+                : `₹${discountAmount} discount applied! Total payable: ₹${finalAmount}`
+        };
+    },
+
+    async validateCoupon(couponCode, baseAmount = 2200) {
+        if (!couponCode || typeof couponCode !== 'string') {
+            return { valid: false, message: "Please enter a coupon code." };
+        }
+        const cleanCode = couponCode.trim().toUpperCase();
+        
+        try {
+            const couponDoc = await getDoc(doc(db, "coupons", cleanCode));
+            if (couponDoc.exists() && couponDoc.data().active !== false) {
+                const coupon = couponDoc.data();
+                let discountAmount = 0;
+                if (coupon.discountType === "PERCENT") {
+                    discountAmount = Math.round((baseAmount * (coupon.discountValue || 100)) / 100);
+                } else {
+                    discountAmount = Math.min(baseAmount, Number(coupon.discountValue) || 0);
+                }
+                const finalAmount = Math.max(0, baseAmount - discountAmount);
+                return {
+                    valid: true,
+                    code: cleanCode,
+                    discountType: coupon.discountType || "PERCENT",
+                    discountValue: coupon.discountValue,
+                    discountAmount,
+                    baseAmount,
+                    finalAmount,
+                    description: coupon.description || "Admin Promo Code",
+                    message: discountAmount >= baseAmount 
+                        ? `100% Discount Applied! Total payable: ₹0` 
+                        : `₹${discountAmount} discount applied! Total payable: ₹${finalAmount}`
+                };
+            }
+        } catch (e) {}
+
+        return this.validateCouponSync(cleanCode, baseAmount);
+    },
+
+    async saveCoupon(couponData) {
+        const code = (couponData.code || '').trim().toUpperCase();
+        if (!code) throw new Error("Coupon code is required");
+        const newCoupon = {
+            code,
+            discountType: couponData.discountType || "PERCENT",
+            discountValue: Number(couponData.discountValue) || 0,
+            description: couponData.description || `${code} Discount`,
+            active: couponData.active !== false,
+            createdAt: new Date().toISOString()
+        };
+        const coupons = this.getCouponsSync();
+        const idx = coupons.findIndex(c => c.code === code);
+        if (idx !== -1) {
+            coupons[idx] = { ...coupons[idx], ...newCoupon };
+        } else {
+            coupons.push(newCoupon);
+        }
+        localStorage.setItem(STORAGE_KEYS.COUPONS, JSON.stringify(coupons));
+        emitDataSync();
+        try {
+            await setDoc(doc(db, "coupons", code), newCoupon);
+        } catch (e) {}
+        return newCoupon;
+    },
+
+    // ----------------------------------------------------
+    // ADMIN MASTER WALLET CREDITING & TRANSACTION AUDITING
+    // ----------------------------------------------------
+    async creditAdminWallet(amount, source = "PLATFORM_FEE", metadata = {}) {
+        const cleanAmount = Number(amount) || 0;
+        if (cleanAmount <= 0) return 0;
+
+        const users = this.getUsersSync();
+        const adminIdx = users.findIndex(u => u.uid === "usr-owner-snehith" || u.phone === "9030118909" || u.email === "snehith@fitup.com");
+        if (adminIdx !== -1) {
+            users[adminIdx].walletBalance = (users[adminIdx].walletBalance || 0) + cleanAmount;
+            localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
+            try {
+                await updateDoc(doc(db, "users", users[adminIdx].uid), {
+                    walletBalance: users[adminIdx].walletBalance,
+                    updatedAt: new Date().toISOString()
+                });
+            } catch (e) {}
+        }
+
+        try {
+            const platformRef = doc(db, "config", "platform_wallet");
+            const snap = await getDoc(platformRef);
+            let curBalance = 0;
+            if (snap.exists()) {
+                curBalance = snap.data().balance || 0;
+            }
+            await setDoc(platformRef, {
+                balance: curBalance + cleanAmount,
+                lastCreditAmount: cleanAmount,
+                lastCreditSource: source,
+                lastCreditMetadata: metadata,
+                updatedAt: new Date().toISOString()
+            }, { merge: true });
+        } catch (e) {}
+
+        emitDataSync();
+        return cleanAmount;
+    },
+
+    getAdminWalletBalanceSync() {
+        const users = this.getUsersSync();
+        const admin = users.find(u => u.uid === "usr-owner-snehith" || u.phone === "9030118909" || u.email === "snehith@fitup.com");
+        return admin?.walletBalance || 0;
     },
 
     clearAllTestData() {

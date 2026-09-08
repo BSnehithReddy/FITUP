@@ -408,7 +408,7 @@ export const AuthProvider = ({ children }) => {
   /**
    * Helper: Register a Gym Owner with Firebase Auth, Firestore `gyms/{gymId}` and `users/{uid}`
    */
-  const registerGymOwner = async (ownerName, gymName, location, ownerPhone, ownerEmail, ownerPassword, address = '') => {
+  const registerGymOwner = async (ownerName, gymName, location, ownerPhone, ownerEmail, ownerPassword, address = '', paymentData = null) => {
     soundEffects.playClick();
     const cleanEmail = (ownerEmail || '').toLowerCase().trim();
     const cleanPhone = (ownerPhone || '').trim();
@@ -444,6 +444,8 @@ export const AuthProvider = ({ children }) => {
       }
     }
 
+    const amountPaid = paymentData?.amountPaid !== undefined ? Number(paymentData.amountPaid) : 2200;
+    const paymentId = paymentData?.paymentId || ('pay_rzp_reg_' + Date.now());
 
     const newGym = {
       gymId,
@@ -461,6 +463,18 @@ export const AuthProvider = ({ children }) => {
       ownerPassword: ownerPassword,
       gymSplitPercent: 30,
       walletBalance: 0,
+      feePaid: true,
+      amountPaid: amountPaid,
+      paymentId: paymentId,
+      registrationPayment: {
+        feeAmount: 2200,
+        amountPaid: amountPaid,
+        discountApplied: paymentData?.discountApplied || Math.max(0, 2200 - amountPaid),
+        couponCode: paymentData?.couponCode || null,
+        paymentId: paymentId,
+        orderId: paymentData?.orderId || null,
+        paidAt: new Date().toISOString()
+      },
       ownerUpiId: `${cleanPhone}@upi`,
       ownerQrCodeUrl: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=upi://pay?pa=${cleanPhone}@upi&pn=${encodeURIComponent(gymName)}&am=280&cu=INR`,
       socialHandles: {
@@ -472,6 +486,17 @@ export const AuthProvider = ({ children }) => {
     };
 
     await firestoreService.saveGym(newGym);
+
+    // Credit registration fee directly to Master Admin Wallet in Firestore
+    if (amountPaid > 0) {
+      await firestoreService.creditAdminWallet(amountPaid, "GYM_REGISTRATION_FEE", {
+        gymId,
+        gymName,
+        ownerName,
+        paymentId,
+        couponCode: paymentData?.couponCode || null
+      });
+    }
 
     const ownerProfile = {
       uid,
