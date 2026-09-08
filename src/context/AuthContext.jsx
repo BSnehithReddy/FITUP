@@ -639,6 +639,8 @@ export const AuthProvider = ({ children }) => {
       verifyOtpAndSetPassword,
       sendPasswordReset,
       deleteAccount,
+      syncCloudData: () => firestoreService.syncAllToCloud(),
+      initCloudFirestore: () => firestoreService.initCloudFirestore(),
       logout
     }}>
       {children}

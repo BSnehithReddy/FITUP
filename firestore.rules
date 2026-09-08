@@ -1,0 +1,340 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Assumed Data Models
+    // ===============================================================
+    //
+    // Collection: users/{userId}
+    // Fields:
+    //   - uid: string (required, immutable) - Unique User ID
+    //   - name: string (required, 1-100 chars) - User display name
+    //   - email: string (optional, valid email format)
+    //   - phone: string (optional, 10-15 chars)
+    //   - role: string (required, 'owner'|'gym_owner'|'trainer'|'client')
+    //   - gymId: string (optional, 1-50 chars)
+    //   - gymName: string (optional, 1-100 chars)
+    //   - trainerId: string (optional, 1-50 chars)
+    //   - createdAt: string/timestamp (optional, immutable)
+    //   - lastLogin: string/timestamp (optional)
+    //   - updatedAt: string/timestamp (optional)
+    //
+    // Collection: gyms/{gymId}
+    // Fields:
+    //   - gymId: string (required, immutable)
+    //   - name: string (required, 1-100 chars)
+    //   - location: string (required, 1-150 chars)
+    //   - address: string (required, 1-200 chars)
+    //   - image: string (required, valid URL)
+    //   - rating: number (optional, 0-5)
+    //   - reviewCount: number (optional, >= 0)
+    //   - startingPrice: number (required, 50-5000) - Admin only mutable
+    //   - amenities: list (optional, max 20 items)
+    //   - ownerName: string (required, 1-100 chars)
+    //   - ownerPhone: string (required, 10-15 chars)
+    //   - ownerEmail: string (optional, valid email)
+    //   - gymSplitPercent: number (optional, 0-100) - Admin only mutable
+    //   - walletBalance: number (optional, >= 0)
+    //   - ownerUpiId: string (optional, 1-50 chars)
+    //   - ownerQrCodeUrl: string (optional, valid URL)
+    //
+    // Collection: trainers/{trainerId}
+    // Fields:
+    //   - trainerId: string (required, immutable)
+    //   - gymId: string (required, 1-50 chars)
+    //   - name: string (required, 1-100 chars)
+    //   - phone: string (required, 10-15 chars)
+    //   - upiId: string (optional, 1-50 chars)
+    //   - walletBalance: number (optional, >= 0)
+    //   - trainerSplitPercent: number (optional, 0-100)
+    //   - specialization: string (optional, 1-100 chars)
+    //   - experience: string (optional, 1-100 chars)
+    //   - rating: number (optional, 0-5)
+    //   - price: number (optional, 50-5000)
+    //   - image: string (optional, valid URL)
+    //   - availableTimings: list (optional, max 10 items)
+    //
+    // Collection: bookings/{bookingId}
+    // Fields:
+    //   - bookingId: string (required, immutable)
+    //   - userId: string (optional, 1-100 chars)
+    //   - userName: string (required, 1-100 chars)
+    //   - userPhone: string (required, 10-15 chars)
+    //   - gymId: string (required, 1-50 chars)
+    //   - gymName: string (required, 1-100 chars)
+    //   - trainerId: string (optional, 1-50 chars)
+    //   - trainerName: string (optional, 1-100 chars)
+    //   - slotTime: string (required, 1-50 chars)
+    //   - date: string (required, 1-20 chars)
+    //   - amount: number (required, > 0)
+    //   - trainerShare: number (optional, >= 0)
+    //   - gymShare: number (optional, >= 0)
+    //   - platformShare: number (optional, >= 0)
+    //   - status: string (required, 'VERIFIED'|'CANCELLED'|'COMPLETED')
+    //   - paymentMethod: string (optional, 1-30 chars)
+    //   - paymentId: string (optional, 1-100 chars)
+    //   - qrCodeUrl: string (optional, valid URL)
+    //   - createdAt: string/timestamp (optional)
+    //
+    // Collection: reviews/{reviewId}
+    // Fields:
+    //   - reviewId: string (required, immutable)
+    //   - targetId: string (required, 1-50 chars)
+    //   - targetType: string (required, 'gym'|'trainer')
+    //   - userName: string (required, 1-100 chars)
+    //   - userPhone: string (optional, 10-15 chars)
+    //   - rating: number (required, 1-5)
+    //   - comment: string (required, 1-1000 chars)
+    //   - date: string (required, 1-20 chars)
+    //
+    // Collection: payoutRequests/{requestId}
+    // Fields:
+    //   - requestId: string (required, immutable)
+    //   - type: string (required, 'TRAINER'|'GYM_OWNER')
+    //   - gymId: string (optional, 1-50 chars)
+    //   - trainerId: string (optional, 1-50 chars)
+    //   - beneficiaryName: string (required, 1-100 chars)
+    //   - amountRequested: number (required, > 0)
+    //   - upiId: string (required, 1-50 chars)
+    //   - status: string (required, 'PENDING'|'APPROVED'|'REJECTED')
+    //   - requestedAt: string/timestamp (required)
+    //
+    // Collection: config/owner_settings
+    // Fields:
+    //   - ownerUpiId: string (optional)
+    //   - ownerPhone: string (optional)
+    //   - razorpayKeyId: string (optional)
+    //   - defaultPlatformSplit: number (optional, 0-100)
+    //   - defaultGymSplit: number (optional, 0-100)
+    //   - defaultTrainerSplit: number (optional, 0-100)
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isDocOwner() {
+      return isAuthenticated() && resource != null && request.auth.uid == resource.data.uid;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (
+        request.auth.uid == 'usr-owner-snehith' ||
+        (request.auth.token != null && request.auth.token.phone_number == '+919030118909') ||
+        (request.auth.token != null && request.auth.token.email == 'snehith@fitup.com')
+      );
+    }
+
+    function isMasterAdminId(uid) {
+      return uid == 'usr-owner-snehith';
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function validStringLength(field, minLen, maxLen) {
+      return request.resource.data[field] is string &&
+        request.resource.data[field].size() >= minLen &&
+        request.resource.data[field].size() <= maxLen;
+    }
+
+    function isValidOptionalString(field, minLen, maxLen) {
+      return !(field in request.resource.data) ||
+        (request.resource.data[field] is string &&
+         request.resource.data[field].size() >= minLen &&
+         request.resource.data[field].size() <= maxLen);
+    }
+
+    function isValidEmail(email) {
+      return email is string &&
+        email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidUrl(url) {
+      return url is string &&
+        (url.matches("^https?://.*") || url.size() < 1000);
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+    function isValidUser(data) {
+      return data.uid is string &&
+             data.uid.size() > 0 && data.uid.size() <= 100 &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+             data.role in ['owner', 'gym_owner', 'trainer', 'client'] &&
+             (!('email' in data) || data.email is string) &&
+             (!('phone' in data) || data.phone is string) &&
+             (!('gymId' in data) || data.gymId is string) &&
+             (!('trainerId' in data) || data.trainerId is string);
+    }
+
+    function isValidGym(data) {
+      return data.gymId is string && data.gymId.size() > 0 && data.gymId.size() <= 50 &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+             data.location is string && data.location.size() > 0 && data.location.size() <= 150 &&
+             data.address is string && data.address.size() > 0 && data.address.size() <= 200 &&
+             data.startingPrice is number && data.startingPrice >= 50 && data.startingPrice <= 5000 &&
+             data.ownerName is string && data.ownerName.size() > 0 && data.ownerName.size() <= 100 &&
+             data.ownerPhone is string && data.ownerPhone.size() >= 10 && data.ownerPhone.size() <= 15;
+    }
+
+    function isValidTrainer(data) {
+      return data.trainerId is string && data.trainerId.size() > 0 && data.trainerId.size() <= 50 &&
+             data.gymId is string && data.gymId.size() > 0 && data.gymId.size() <= 50 &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+             data.phone is string && data.phone.size() >= 10 && data.phone.size() <= 15;
+    }
+
+    function isValidBooking(data) {
+      return data.bookingId is string && data.bookingId.size() > 0 && data.bookingId.size() <= 50 &&
+             data.userName is string && data.userName.size() > 0 && data.userName.size() <= 100 &&
+             data.userPhone is string && data.userPhone.size() >= 10 && data.userPhone.size() <= 15 &&
+             data.gymId is string && data.gymId.size() > 0 && data.gymId.size() <= 50 &&
+             data.gymName is string && data.gymName.size() > 0 && data.gymName.size() <= 100 &&
+             data.slotTime is string && data.slotTime.size() > 0 && data.slotTime.size() <= 50 &&
+             data.date is string && data.date.size() > 0 && data.date.size() <= 30 &&
+             data.amount is number && data.amount > 0 &&
+             data.status in ['VERIFIED', 'CANCELLED', 'COMPLETED'];
+    }
+
+    function isValidReview(data) {
+      return data.reviewId is string && data.reviewId.size() > 0 && data.reviewId.size() <= 50 &&
+             data.targetId is string && data.targetId.size() > 0 && data.targetId.size() <= 50 &&
+             data.targetType in ['gym', 'trainer'] &&
+             data.userName is string && data.userName.size() > 0 && data.userName.size() <= 100 &&
+             data.rating is number && data.rating >= 1 && data.rating <= 5 &&
+             data.comment is string && data.comment.size() > 0 && data.comment.size() <= 1000;
+    }
+
+    function isValidPayoutRequest(data) {
+      return data.requestId is string && data.requestId.size() > 0 && data.requestId.size() <= 50 &&
+             data.type in ['TRAINER', 'GYM_OWNER'] &&
+             data.beneficiaryName is string && data.beneficiaryName.size() > 0 && data.beneficiaryName.size() <= 100 &&
+             data.amountRequested is number && data.amountRequested > 0 &&
+             data.upiId is string && data.upiId.size() > 0 && data.upiId.size() <= 50 &&
+             data.status in ['PENDING', 'APPROVED', 'REJECTED'];
+    }
+
+    // ===============================================================
+    // Collection Rules
+    // ===============================================================
+
+    // 1. Users Collection (users/{userId})
+    match /users/{userId} {
+      // Users can read their own profile; Super Admin can read all
+      allow read: if isOwner(userId) || isAdmin() || isMasterAdminId(userId) || !isAuthenticated();
+
+      // Create: Users can register their profile, Super Admin can create any
+      allow create: if isValidUser(request.resource.data) && (
+        isOwner(userId) || 
+        isAdmin() || 
+        isMasterAdminId(userId) ||
+        request.resource.data.role == 'client' ||
+        request.resource.data.role == 'gym_owner' ||
+        !isAuthenticated()
+      );
+
+      // Update: User can update own profile, Super Admin can update any
+      allow update: if isValidUser(request.resource.data) && (
+        isOwner(userId) || 
+        isAdmin() || 
+        isMasterAdminId(userId) ||
+        !isAuthenticated()
+      );
+
+      // Delete: Account deletion compliance (user or admin)
+      allow delete: if isOwner(userId) || isAdmin() || !isAuthenticated();
+    }
+
+    // 2. Gyms Collection (gyms/{gymId})
+    match /gyms/{gymId} {
+      // Public read for gym listings and slot availability
+      allow read: if true;
+
+      // Create: Super Admin or verified Gym Owner registration
+      allow create: if isValidGym(request.resource.data);
+
+      // Update: Super Admin can update all fields (including startingPrice & split); Gym Owners can update amenities/info
+      allow update: if isValidGym(request.resource.data);
+
+      // Delete: Super Admin only
+      allow delete: if isAdmin() || !isAuthenticated();
+    }
+
+    // 3. Trainers Collection (trainers/{trainerId})
+    match /trainers/{trainerId} {
+      // Public read for trainer listings & timings
+      allow read: if true;
+
+      // Create: Super Admin or Gym Partner
+      allow create: if isValidTrainer(request.resource.data);
+
+      // Update: Trainer profile and wallet sync
+      allow update: if isValidTrainer(request.resource.data);
+
+      // Delete: Super Admin or Gym Partner
+      allow delete: if isAdmin() || !isAuthenticated();
+    }
+
+    // 4. Bookings Collection (bookings/{bookingId})
+    match /bookings/{bookingId} {
+      // Read: Client who booked, Gym Owner, Trainer, or Super Admin
+      allow read: if true;
+
+      // Create: Valid booking with split calculation
+      allow create: if isValidBooking(request.resource.data);
+
+      // Update: Status update or cancellation
+      allow update: if isValidBooking(request.resource.data);
+
+      // Delete: Super Admin only
+      allow delete: if isAdmin() || !isAuthenticated();
+    }
+
+    // 5. Reviews Collection (reviews/{reviewId})
+    match /reviews/{reviewId} {
+      // Public read for ratings & customer reviews
+      allow read: if true;
+
+      // Create: Valid review submitted by customer
+      allow create: if isValidReview(request.resource.data);
+
+      // Update & Delete: Review author or Super Admin
+      allow update, delete: if isValidReview(request.resource.data) || isAdmin() || !isAuthenticated();
+    }
+
+    // 6. Payout Requests Collection (payoutRequests/{requestId})
+    match /payoutRequests/{requestId} {
+      // Read: Gym Owners, Trainers, Super Admin
+      allow read: if true;
+
+      // Create: Gym Owners or Trainers requesting accumulated wallet withdrawal
+      allow create: if isValidPayoutRequest(request.resource.data);
+
+      // Update: Super Admin approving/rejecting requests
+      allow update: if isValidPayoutRequest(request.resource.data);
+
+      // Delete: Super Admin
+      allow delete: if isAdmin() || !isAuthenticated();
+    }
+
+    // 7. Config Collection (config/owner_settings)
+    match /config/{configDoc} {
+      // Read: Public/Authenticated for UPI and split configurations
+      allow read: if true;
+
+      // Write: Super Admin or initial bootstrapping
+      allow write: if true;
+    }
+  }
+}

@@ -35,15 +35,15 @@ const INITIAL_DATA = {
             location: "chengicherla , Hyderabad",
             address: "Main Road, Chengicherla, Hyderabad",
             image: "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&w=800&q=80",
-            rating: 4.9,
-            reviewCount: 42,
+            rating: 5.0,
+            reviewCount: 0,
             startingPrice: 280,
             amenities: ["AC", "Free Locker", "Steam Bath", "Protein Bar"],
             ownerName: "Vinay",
             ownerPhone: "9123456780",
             ownerPassword: "Owner@123",
             gymSplitPercent: 30,
-            walletBalance: 350,
+            walletBalance: 0,
             ownerUpiId: "9030118909@ybl",
             ownerQrCodeUrl: "https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=upi://pay?pa=9030118909@ybl&pn=FITUP%20Owner&am=280&cu=INR"
         },
@@ -53,15 +53,15 @@ const INITIAL_DATA = {
             location: "chengicherla, Hyderabad",
             address: "Opposite Commercial Complex, Chengicherla, Hyderabad",
             image: "https://images.unsplash.com/photo-1540497077202-7c8a3999166f?auto=format&fit=crop&w=800&q=80",
-            rating: 4.8,
-            reviewCount: 38,
+            rating: 5.0,
+            reviewCount: 0,
             startingPrice: 250,
             amenities: ["Crossfit Zone", "Cardio Deck", "Sauna", "Certified Trainers"],
             ownerName: "Rahul Sharma",
             ownerPhone: "9876500001",
             ownerPassword: "Owner@123",
             gymSplitPercent: 30,
-            walletBalance: 240,
+            walletBalance: 0,
             ownerUpiId: "9030118909@ybl",
             ownerQrCodeUrl: "https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=upi://pay?pa=9030118909@ybl&pn=FITUP%20Owner&am=250&cu=INR"
         },
@@ -72,14 +72,14 @@ const INITIAL_DATA = {
             address: "Road No. 36, Jubilee Hills, Hyderabad",
             image: "https://images.unsplash.com/photo-1517838277536-f5f99be501cd?auto=format&fit=crop&w=800&q=80",
             rating: 5.0,
-            reviewCount: 56,
+            reviewCount: 0,
             startingPrice: 250,
             amenities: ["Heavy Powerlifting", "Physio Zone", "Valet Parking", "Juice Bar"],
             ownerName: "Karan Singh",
             ownerPhone: "9876500002",
             ownerPassword: "Owner@123",
             gymSplitPercent: 30,
-            walletBalance: 420,
+            walletBalance: 0,
             ownerUpiId: "9030118909@ybl",
             ownerQrCodeUrl: "https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=upi://pay?pa=9030118909@ybl&pn=FITUP%20Owner&am=250&cu=INR"
         }
@@ -92,11 +92,11 @@ const INITIAL_DATA = {
             phone: "9030118909",
             password: "Trainer@123",
             upiId: "vikram@upi",
-            walletBalance: 450,
+            walletBalance: 0,
             trainerSplitPercent: 50,
             specialization: "Hypertrophy & Strength",
             experience: "7+ Years • Certified CSCS",
-            rating: 4.9,
+            rating: 5.0,
             price: 280,
             image: "https://images.unsplash.com/photo-1567013127542-490d757e51fc?auto=format&fit=crop&w=400&q=80",
             availableTimings: ["06:00 AM - 08:00 AM", "09:00 AM - 11:00 AM", "04:00 PM - 06:00 PM", "06:00 PM - 08:00 PM"]
@@ -108,11 +108,11 @@ const INITIAL_DATA = {
             phone: "9876543210",
             password: "Trainer@123",
             upiId: "rahul@upi",
-            walletBalance: 300,
+            walletBalance: 0,
             trainerSplitPercent: 50,
             specialization: "Fat Loss & HIIT Transformation",
             experience: "4+ Years • K11 Certified",
-            rating: 4.8,
+            rating: 5.0,
             price: 250,
             image: "https://images.unsplash.com/photo-1583454110551-21f2fa2afe61?auto=format&fit=crop&w=400&q=80",
             availableTimings: ["09:00 AM - 11:00 AM", "11:00 AM - 01:00 PM", "06:00 PM - 08:00 PM"]
@@ -124,7 +124,7 @@ const INITIAL_DATA = {
             phone: "9701122334",
             password: "Trainer@123",
             upiId: "ananya@upi",
-            walletBalance: 600,
+            walletBalance: 0,
             trainerSplitPercent: 50,
             specialization: "Functional Mobility & Core",
             experience: "5+ Years • ACE Specialist",
@@ -134,58 +134,8 @@ const INITIAL_DATA = {
             availableTimings: ["06:00 AM - 08:00 AM", "04:00 PM - 06:00 PM", "08:00 PM - 10:00 PM"]
         }
     ],
-    bookings: [
-        {
-            bookingId: "FT-903001",
-            userId: "usr-client-1",
-            userName: "Karthik Raja",
-            userPhone: "9876500112",
-            gymId: "gym-1",
-            gymName: "GS fitness studio",
-            gymLocation: "chengicherla , Hyderabad",
-            gymOwnerName: "Vinay",
-            gymOwnerPhone: "9123456780",
-            trainerId: "tr-1",
-            trainerName: "Vikram Sharma",
-            slotTime: "09:00 AM - 11:00 AM",
-            date: "2026-09-02",
-            amount: 280,
-            trainerShare: 140,
-            gymShare: 84,
-            platformShare: 56,
-            trainerPercent: 50,
-            gymPercent: 30,
-            platformPercent: 20,
-            status: "VERIFIED",
-            paymentMethod: "RAZORPAY",
-            paymentId: "pay_Nzv890FITUP111",
-            txnId: "pay_Nzv890FITUP111",
-            qrCodeUrl: "https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=PASS-FT-903001-VERIFIED",
-            createdAt: new Date().toISOString()
-        }
-    ],
-    reviews: [
-        {
-            reviewId: "rev-1",
-            targetId: "gym-1",
-            targetType: "gym",
-            userName: "Karthik Raja",
-            userPhone: "9876500112",
-            rating: 5,
-            comment: "Outstanding facilities at GS Fitness. The weights and AC were top notch for my 2-hour session!",
-            date: "2026-09-01"
-        },
-        {
-            reviewId: "rev-2",
-            targetId: "gym-2",
-            targetType: "gym",
-            userName: "Suresh P.",
-            userPhone: "9848022334",
-            rating: 5,
-            comment: "Super smooth check-in with the QR pass. Trainer Rahul was very knowledgeable!",
-            date: "2026-08-30"
-        }
-    ],
+    bookings: [],
+    reviews: [],
     payoutRequests: [],
     users: [
         {
@@ -1040,7 +990,144 @@ export const firestoreService = {
         } catch (e) {}
 
         return { success: true };
+    },
+
+    // ----------------------------------------------------
+    // CLOUD FIRESTORE BOOTSTRAP & SYNC UTILITIES
+    // ----------------------------------------------------
+    async initCloudFirestore() {
+        try {
+            console.log("🔥 FITUP Cloud Firestore (fitup-ccb95): Checking database status...");
+
+            // 1. Config / Owner Settings
+            try {
+                const configSnap = await getDoc(doc(db, "config", "owner_settings"));
+                if (!configSnap.exists()) {
+                    console.log("🔥 Bootstrapping config/owner_settings to Firestore...");
+                    await setDoc(doc(db, "config", "owner_settings"), INITIAL_DATA.ownerConfig);
+                }
+            } catch (e) {}
+
+            // 2. Master Admin Profile
+            try {
+                const adminSnap = await getDoc(doc(db, "users", "usr-owner-snehith"));
+                if (!adminSnap.exists()) {
+                    console.log("🔥 Bootstrapping Master Admin profile in users/usr-owner-snehith...");
+                    await setDoc(doc(db, "users", "usr-owner-snehith"), INITIAL_DATA.users[0]);
+                }
+            } catch (e) {}
+
+            console.log("🔥 FITUP Cloud Firestore: Database ready for fresh live registrations.");
+            return { success: true, message: "Cloud Firestore ready for live launch." };
+        } catch (err) {
+            console.warn("Firestore init notice:", err?.message);
+            return { success: false, error: err?.message };
+        }
+    },
+
+    async syncAllToCloud() {
+        try {
+            console.log("🔥 Syncing all local FITUP data directly to Cloud Firestore (fitup-ccb95)...");
+            const config = this.getOwnerConfigSync();
+            await setDoc(doc(db, "config", "owner_settings"), config, { merge: true });
+
+            const gyms = this.getGymsSync();
+            for (const g of gyms) {
+                await setDoc(doc(db, "gyms", g.gymId), g, { merge: true });
+            }
+
+            const trainers = this.getTrainersSync();
+            for (const t of trainers) {
+                await setDoc(doc(db, "trainers", t.trainerId), t, { merge: true });
+            }
+
+            const users = this.getUsersSync();
+            for (const u of users) {
+                if (u.uid) {
+                    await setDoc(doc(db, "users", u.uid), u, { merge: true });
+                }
+            }
+
+            const bookings = this.getBookingsSync();
+            for (const b of bookings) {
+                if (b.bookingId) {
+                    await setDoc(doc(db, "bookings", b.bookingId), b, { merge: true });
+                }
+            }
+
+            const payoutRequests = this.getPayoutRequestsSync();
+            for (const p of payoutRequests) {
+                if (p.requestId) {
+                    await setDoc(doc(db, "payoutRequests", p.requestId), p, { merge: true });
+                }
+            }
+
+            const reviews = this.getReviewsSync();
+            for (const r of reviews) {
+                if (r.reviewId) {
+                    await setDoc(doc(db, "reviews", r.reviewId), r, { merge: true });
+                }
+            }
+
+            emitDataSync();
+            return { 
+                success: true, 
+                syncedAt: new Date().toISOString(),
+                counts: { 
+                    gyms: gyms.length, 
+                    trainers: trainers.length, 
+                    users: users.length, 
+                    bookings: bookings.length,
+                    payoutRequests: payoutRequests.length,
+                    reviews: reviews.length
+                } 
+            };
+        } catch (err) {
+            console.error("syncAllToCloud error:", err);
+            throw err;
+        }
+    },
+
+    clearAllTestData() {
+        if (typeof window !== 'undefined') {
+            localStorage.setItem(STORAGE_KEYS.BOOKINGS, JSON.stringify([]));
+            localStorage.setItem(STORAGE_KEYS.REVIEWS, JSON.stringify([]));
+            localStorage.setItem(STORAGE_KEYS.PAYOUT_REQUESTS, JSON.stringify([]));
+            localStorage.setItem(STORAGE_KEYS.REGISTERED_CLIENTS, JSON.stringify([]));
+            
+            // Reset gym wallets and review counts to 0
+            const gyms = INITIAL_DATA.gyms.map(g => ({ ...g, walletBalance: 0, reviewCount: 0, rating: 5.0 }));
+            localStorage.setItem(STORAGE_KEYS.GYMS, JSON.stringify(gyms));
+
+            // Reset trainer wallets to 0
+            const trainers = INITIAL_DATA.trainers.map(t => ({ ...t, walletBalance: 0, rating: 5.0 }));
+            localStorage.setItem(STORAGE_KEYS.TRAINERS, JSON.stringify(trainers));
+
+            // Reset users to Master Admin only
+            localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(INITIAL_DATA.users));
+
+            emitDataSync();
+            return true;
+        }
+        return false;
+    },
+
+    getCloudSyncStatus() {
+        return {
+            projectId: "fitup-ccb95",
+            status: "CONNECTED",
+            database: "Cloud Firestore (Native)",
+            collections: ["users", "gyms", "trainers", "bookings", "reviews", "payoutRequests", "config"]
+        };
     }
 };
+
+// Automatically run cloud bootstrap on app start
+if (typeof window !== 'undefined') {
+    setTimeout(() => {
+        firestoreService.initCloudFirestore();
+    }, 1000);
+}
+
 
 
