@@ -288,7 +288,7 @@ export const LegalModal = ({ isOpen, onClose, initialTab = 'privacy', onOpenDele
               <div className="p-4 rounded-2xl bg-slate-950 border border-white/10 space-y-2 text-xs">
                 <p className="font-bold text-white">Need Help with a Booking or Refund?</p>
                 <p className="text-slate-400">Reach out to our 24/7 Support Desk with your Booking ID (e.g., FT-903001):</p>
-                <p className="text-electricBlue font-mono">support@fitup.app • +91 9030118909</p>
+                <p className="text-electricBlue font-mono">support@fitup.app • +91 9030118909 • Developed by B. Snehith Reddy</p>
               </div>
             </div>
           )}

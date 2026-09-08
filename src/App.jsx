@@ -165,8 +165,9 @@ const MainContent = () => {
 
         {/* Developer Attribution Credit */}
         <div className="pt-2 text-[11px] text-slate-400 font-medium tracking-wide">
-          Developed by <span className="text-electricBlue font-bold hover:underline cursor-pointer">Snehith</span>
+          Developed by <span className="text-electricBlue font-bold hover:underline cursor-pointer">B. Snehith Reddy</span>
         </div>
+
 
         <p className="text-[10px] text-slate-600">
           © {new Date().getFullYear()} FITUP Fitness Technologies Private Limited. All rights reserved. • Google Play Store Verified
