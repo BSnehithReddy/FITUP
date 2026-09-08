@@ -7,9 +7,9 @@ export const IntroSplash = ({ onFinish }) => {
   const [fadeOut, setFadeOut] = useState(false);
 
   useEffect(() => {
-    // 4-second progress loader animation
+    // Quick, high-impact 1.2-second intro loader
     const startTime = Date.now();
-    const duration = 3800; // 3.8s loading + 200ms fade out
+    const duration = 1200;
 
     const interval = setInterval(() => {
       const elapsed = Date.now() - startTime;
@@ -21,15 +21,18 @@ export const IntroSplash = ({ onFinish }) => {
         setFadeOut(true);
         setTimeout(() => {
           onFinish();
-        }, 300);
+        }, 200);
       }
-    }, 40);
+    }, 25);
 
     return () => clearInterval(interval);
   }, [onFinish]);
 
   return (
-    <div className={`fixed inset-0 z-[9999] bg-[#070b19] flex flex-col items-center justify-center transition-opacity duration-300 ${fadeOut ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+    <div 
+      onClick={() => onFinish()}
+      className={`fixed inset-0 z-[9999] bg-[#070b19] flex flex-col items-center justify-center transition-opacity duration-300 cursor-pointer ${fadeOut ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+    >
       
       {/* Background Floating Fitness Accents */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-20">
@@ -46,35 +49,35 @@ export const IntroSplash = ({ onFinish }) => {
 
       {/* Intro Logo Container */}
       <div className="relative flex flex-col items-center z-10 px-4">
-        <div className="relative w-36 h-36 mb-6 flex items-center justify-center">
+        <div className="relative w-32 h-32 mb-5 flex items-center justify-center">
           {/* Orbital Neon Rings */}
           <div className="absolute inset-0 rounded-full border-2 border-dashed border-electricBlue animate-spin-slow opacity-80 shadow-[0_0_25px_#00f0ff]"></div>
           <div className="absolute inset-2 rounded-full border border-vibrantOrange animate-pulse-glow opacity-60"></div>
 
           {/* Logo Image */}
-          <LogoImage className="w-24 h-24 object-contain rounded-2xl drop-shadow-[0_0_20px_rgba(0,240,255,0.6)]" />
+          <LogoImage className="w-20 h-20 object-contain rounded-2xl drop-shadow-[0_0_20px_rgba(0,240,255,0.6)]" />
         </div>
 
         {/* Brand Title */}
-        <h1 className="text-5xl md:text-6xl font-extrabold tracking-wider text-white mb-2 font-outfit">
+        <h1 className="text-4xl md:text-5xl font-extrabold tracking-wider text-white mb-2 font-outfit">
           FIT<span className="text-[#00f0ff] drop-shadow-[0_0_15px_#00f0ff]">UP</span>
         </h1>
 
         {/* Tagline */}
-        <p className="text-vibrantOrange tracking-[0.3em] text-sm md:text-base font-semibold mb-8 uppercase drop-shadow-[0_0_10px_#ff5500]">
+        <p className="text-vibrantOrange tracking-[0.3em] text-xs md:text-sm font-semibold mb-6 uppercase drop-shadow-[0_0_10px_#ff5500]">
           BOOK. LIFT. REPEAT.
         </p>
 
         {/* Loader Bar */}
-        <div className="w-64 h-2 bg-slate-800/80 rounded-full overflow-hidden border border-white/10 p-0.5 shadow-inner">
+        <div className="w-56 h-1.5 bg-slate-800/80 rounded-full overflow-hidden border border-white/10 p-0.5 shadow-inner">
           <div 
             className="h-full bg-gradient-to-r from-electricBlue via-blue-400 to-vibrantOrange rounded-full transition-all duration-75 shadow-[0_0_12px_#00f0ff]"
             style={{ width: `${progress}%` }}
           />
         </div>
 
-        <span className="text-xs text-slate-400 font-mono mt-3">
-          INITIALIZING FITNESS PORTAL ({progress}%)
+        <span className="text-[10px] text-slate-500 font-mono mt-2">
+          TAP TO SKIP • LOADING ({progress}%)
         </span>
       </div>
     </div>

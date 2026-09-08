@@ -5,6 +5,7 @@ import { razorpayService } from '../services/razorpayService';
 import { SafeImage } from './SafeImage';
 import { useAuth } from '../context/AuthContext';
 import { DeleteAccountModal } from "./DeleteAccountModal";
+import { LandingSection } from './LandingSection';
 import { 
   Search, MapPin, Star, Trash2, ShieldCheck, Dumbbell, Clock, 
   Sparkles, ChevronRight, QrCode, CheckCircle2, Ticket, 
@@ -355,21 +356,45 @@ export const ClientDashboard = ({ activeTab = 'home', setActiveTab }) => {
       {/* TAB 1: EXPLORE GYMS & SEARCH (HOME) */}
       {/* ========================================================== */}
       {activeTab === 'home' && (
-        <>
-          {/* Hero Search & Location Filter Header */}
-          <div className="glass-panel p-6 rounded-3xl border border-white/10 space-y-6 shadow-2xl relative overflow-hidden">
+        <div className="space-y-12">
+          
+          {/* Main Interactive Landing Section */}
+          <LandingSection
+            onExploreGyms={() => {
+              const el = document.getElementById('gym-explorer-section');
+              if (el) {
+                el.scrollIntoView({ behavior: 'smooth' });
+                setTimeout(() => {
+                  const input = document.getElementById('gym-search-input');
+                  if (input) input.focus();
+                }, 400);
+              }
+            }}
+            onOpenGymOwnerAuth={() => {
+              if (currentUser?.role === 'gym_owner') {
+                setActiveTab('gym_owner_dash');
+              } else {
+                openAuthModal('register');
+              }
+            }}
+            onOpenUserAuth={() => openAuthModal('register')}
+            onOpenLegal={onOpenLegal}
+          />
+
+          {/* Dedicated Live Gym Explorer & Search Engine */}
+          <div id="gym-explorer-section" className="glass-panel p-6 rounded-3xl border border-white/10 space-y-6 shadow-2xl relative overflow-hidden pt-8">
             <div className="absolute top-0 right-0 w-96 h-96 bg-electricBlue/10 rounded-full blur-3xl pointer-events-none" />
 
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 z-10 relative">
               <div>
-                <span className="text-xs uppercase font-bold tracking-[0.25em] text-vibrantOrange flex items-center gap-1.5">
-                  <Sparkles className="w-4 h-4" /> Live Single-Session Trial Booking
+                <span className="text-xs uppercase font-bold tracking-[0.25em] text-electricBlue flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4" /> Live Booking Engine
                 </span>
-                <h1 className="text-3xl sm:text-4xl font-extrabold text-white font-outfit mt-1">
-                  Book 2-Hour Gym & PT Slots
-                </h1>
-                <p className="text-slate-400 text-sm mt-1">
-                  Access premium fitness arenas for just ₹200 – ₹280 per session. No membership commitments.
+                <h2 className="text-2xl sm:text-3xl font-extrabold text-white font-outfit mt-1">
+                  Find & Book Nearby Partner Gyms
+                </h2>
+                <p className="text-slate-400 text-xs sm:text-sm mt-1">
+                  Select your preferred gym, choose your trainer & 2-hour workout time slot.
                 </p>
               </div>
 
@@ -388,59 +413,6 @@ export const ClientDashboard = ({ activeTab = 'home', setActiveTab }) => {
                   <ShieldCheck className="w-3.5 h-3.5 text-vibrantOrange" /> 100% Refund Policy
                 </button>
               </div>
-            </div>
-
-            {/* Dual Persona Choice Quick Banner */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-              
-              {/* Persona 1: Gym Enthusiast */}
-              <div className="p-4 rounded-2xl bg-slate-900/90 border border-electricBlue/30 flex items-center justify-between gap-4 hover:border-electricBlue transition-all shadow-lg">
-                <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 rounded-xl bg-electricBlue/10 border border-electricBlue/30 text-electricBlue flex items-center justify-center font-bold flex-shrink-0">
-                    <Dumbbell className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-extrabold text-white font-outfit">Gym Enthusiast</h3>
-                    <p className="text-[11px] text-slate-400">Book single slots • ₹200-₹280 with PT</p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => {
-                    const searchEl = document.getElementById('gym-search-input');
-                    if (searchEl) searchEl.focus();
-                  }}
-                  className="px-3 py-1.5 bg-electricBlue/10 border border-electricBlue/40 text-electricBlue hover:bg-electricBlue hover:text-slate-950 text-xs font-bold rounded-xl transition-all whitespace-nowrap"
-                >
-                  Find Gyms ↓
-                </button>
-              </div>
-
-              {/* Persona 2: Gym Owner */}
-              <div className="p-4 rounded-2xl bg-slate-900/90 border border-emerald-400/30 flex items-center justify-between gap-4 hover:border-emerald-400 transition-all shadow-lg">
-                <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 rounded-xl bg-emerald-400/10 border border-emerald-400/30 text-emerald-400 flex items-center justify-center font-bold flex-shrink-0">
-                    <Building2 className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-extrabold text-white font-outfit">Gym Owner</h3>
-                    <p className="text-[11px] text-slate-400">List arena, trainers & receive 24-48h UPI</p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => {
-                    soundEffects.playClick();
-                    if (currentUser?.role === 'gym_owner') {
-                      setActiveTab('gym_owner_dash');
-                    } else {
-                      openAuthModal('register');
-                    }
-                  }}
-                  className="px-3 py-1.5 bg-emerald-400 text-slate-950 font-black rounded-xl text-xs shadow-[0_0_15px_#34d399] hover:scale-105 transition-all whitespace-nowrap"
-                >
-                  {currentUser?.role === 'gym_owner' ? 'Open Dashboard →' : 'List Your Gym →'}
-                </button>
-              </div>
-
             </div>
 
             {/* Instant Search Bar & Location Chips */}
@@ -612,7 +584,7 @@ export const ClientDashboard = ({ activeTab = 'home', setActiveTab }) => {
               </div>
             )}
           </div>
-        </>
+        </div>
       )}
 
       {/* ========================================================== */}
