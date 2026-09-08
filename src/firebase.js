@@ -5,6 +5,8 @@ import {
     createUserWithEmailAndPassword, 
     sendPasswordResetEmail, 
     signInWithPhoneNumber,
+    signInWithPopup,
+    GoogleAuthProvider,
     RecaptchaVerifier,
     updatePassword,
     signOut, 
@@ -49,6 +51,12 @@ const db = getFirestore(app);
 // Initialize Firebase Authentication
 const auth = getAuth(app);
 
+// Initialize Google Auth Provider
+const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({
+  prompt: 'select_account'
+});
+
 // Initialize Firebase Analytics safely (supporting web, SSR, and webviews)
 let analytics = null;
 if (typeof window !== 'undefined') {
@@ -66,6 +74,9 @@ export {
     app,
     db, 
     auth,
+    googleProvider,
+    signInWithPopup,
+    GoogleAuthProvider,
     signInWithEmailAndPassword,
     createUserWithEmailAndPassword,
     sendPasswordResetEmail,
@@ -91,5 +102,6 @@ export {
     orderBy,
     serverTimestamp 
 };
+
 
 

@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { 
   auth, 
+  googleProvider,
+  signInWithPopup,
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
   sendPasswordResetEmail, 
@@ -12,6 +14,7 @@ import { firestoreService } from '../services/firestoreService';
 import { soundEffects } from '../services/soundEffects';
 
 const AuthContext = createContext();
+
 
 const REGISTERED_CLIENTS_KEY = "fitup_registered_clients";
 
@@ -677,6 +680,166 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  /**
+   * Google One-Tap / Popup Authentication for both Gym Enthusiasts & Gym Owners
+   * Handles role assignments, profile generation, and sync with Firestore `users/{uid}` and `gyms/{gymId}`
+   */
+  const loginWithGoogle = async (persona = 'client', extraGymData = {}) => {
+    soundEffects.playClick();
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      const fbUser = result.user;
+      const email = fbUser.email ? fbUser.email.toLowerCase() : "";
+      const name = fbUser.displayName || email.split('@')[0] || "FITUP User";
+      const photoURL = fbUser.photoURL || "";
+
+      // 1. MASTER ADMIN CHECK (SNEHITH)
+      if (email === "snehith@fitup.com" || fbUser.phoneNumber === "9030118909") {
+        const masterAdmin = {
+          uid: fbUser.uid,
+          name: "SNEHITH",
+          phone: "9030118909",
+          email: "snehith@fitup.com",
+          photoURL: photoURL,
+          role: "owner",
+          createdAt: "2026-08-01T00:00:00.000Z",
+          lastLogin: new Date().toISOString()
+        };
+        await firestoreService.saveUserProfile(masterAdmin);
+        await firestoreService.updateUserLastLogin(masterAdmin.uid);
+        setCurrentUser(masterAdmin);
+        soundEffects.playSuccessChime();
+        closeAuthModal();
+        return { success: true, user: masterAdmin, role: "owner" };
+      }
+
+      // 2. CHECK IF USER ALREADY EXISTS IN FIRESTORE users/{uid}
+      let profile = await firestoreService.getUserProfile(fbUser.uid);
+
+      if (profile) {
+        profile = {
+          ...profile,
+          photoURL: photoURL || profile.photoURL,
+          lastLogin: new Date().toISOString()
+        };
+        await firestoreService.saveUserProfile(profile);
+        await firestoreService.updateUserLastLogin(profile.uid);
+        setCurrentUser(profile);
+        soundEffects.playSuccessChime();
+        closeAuthModal();
+        return { success: true, user: profile, role: profile.role || "client" };
+      }
+
+      // 3. CHECK IF EMAIL MATCHES EXISTING GYM IN FIRESTORE gyms
+      const gyms = firestoreService.getGymsSync();
+      const matchedGym = gyms.find(g => g.ownerEmail?.toLowerCase() === email);
+
+      if (matchedGym) {
+        profile = {
+          uid: fbUser.uid,
+          name: matchedGym.ownerName || name,
+          email: email,
+          phone: matchedGym.ownerPhone || "",
+          gymId: matchedGym.gymId,
+          gymName: matchedGym.name,
+          photoURL: photoURL,
+          role: "gym_owner",
+          createdAt: new Date().toISOString(),
+          lastLogin: new Date().toISOString()
+        };
+        await firestoreService.saveUserProfile(profile);
+        await firestoreService.updateUserLastLogin(profile.uid);
+        setCurrentUser(profile);
+        soundEffects.playSuccessChime();
+        closeAuthModal();
+        return { success: true, user: profile, role: "gym_owner", gym: matchedGym };
+      }
+
+      // 4. NEW REGISTRATION WITH GOOGLE
+      if (persona === 'gym_owner') {
+        const gymId = extraGymData.gymId || ('gym-' + Date.now());
+        const gymName = extraGymData.gymName || `${name}'s Fitness Arena`;
+        const location = extraGymData.location || "Hyderabad";
+        const ownerPhone = extraGymData.ownerPhone || "";
+
+        const newGym = {
+          gymId,
+          name: gymName,
+          location: location,
+          address: extraGymData.address || `${location}`,
+          image: "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&w=800&q=80",
+          rating: 5.0,
+          reviewCount: 0,
+          startingPrice: 280,
+          amenities: ["AC", "Free Locker", "Steam Bath", "Protein Bar"],
+          ownerName: name,
+          ownerPhone: ownerPhone,
+          ownerEmail: email,
+          gymSplitPercent: 30,
+          walletBalance: 0,
+          ownerUpiId: ownerPhone ? `${ownerPhone}@upi` : "9030118909@ybl",
+          ownerQrCodeUrl: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=upi://pay?pa=${ownerPhone ? `${ownerPhone}@upi` : '9030118909@ybl'}&pn=${encodeURIComponent(gymName)}&am=280&cu=INR`,
+          socialHandles: {
+            instagram: "",
+            whatsapp: ownerPhone,
+            website: ""
+          },
+          createdAt: new Date().toISOString()
+        };
+
+        await firestoreService.saveGym(newGym);
+
+        profile = {
+          uid: fbUser.uid,
+          name: name,
+          email: email,
+          phone: ownerPhone,
+          photoURL: photoURL,
+          gymId: gymId,
+          gymName: gymName,
+          role: "gym_owner",
+          createdAt: new Date().toISOString(),
+          lastLogin: new Date().toISOString()
+        };
+        await firestoreService.saveUserProfile(profile);
+        await firestoreService.updateUserLastLogin(profile.uid);
+        setCurrentUser(profile);
+        soundEffects.playSuccessChime();
+        closeAuthModal();
+        return { success: true, user: profile, role: "gym_owner", gym: newGym };
+      } else {
+        // Regular Client
+        profile = {
+          uid: fbUser.uid,
+          name: name,
+          email: email,
+          phone: "",
+          photoURL: photoURL,
+          role: "client",
+          createdAt: new Date().toISOString(),
+          lastLogin: new Date().toISOString()
+        };
+        await firestoreService.saveUserProfile(profile);
+        await firestoreService.updateUserLastLogin(profile.uid);
+        setCurrentUser(profile);
+        soundEffects.playSuccessChime();
+        closeAuthModal();
+        return { success: true, user: profile, role: "client" };
+      }
+    } catch (err) {
+      soundEffects.playError();
+      if (err.code === 'auth/popup-closed-by-user') {
+        throw new Error("Google sign-in popup was closed before completing.");
+      } else if (err.code === 'auth/cancelled-popup-request') {
+        throw new Error("Google sign-in was cancelled.");
+      } else if (err.code === 'auth/popup-blocked') {
+        throw new Error("Popup was blocked by your browser. Please allow popups for this site.");
+      } else {
+        throw new Error(err.message || "Failed to authenticate with Google. Please try again.");
+      }
+    }
+  };
+
   const deleteAccount = async () => {
     if (!currentUser) return;
     soundEffects.playClick();
@@ -709,6 +872,7 @@ export const AuthProvider = ({ children }) => {
       closeAuthModal,
       setAuthMode,
       login,
+      loginWithGoogle,
       register,
       registerGymOwner,
       registerGymOwnerAuth,
@@ -726,5 +890,6 @@ export const AuthProvider = ({ children }) => {
 };
 
 export const useAuth = () => useContext(AuthContext);
+
 
 
