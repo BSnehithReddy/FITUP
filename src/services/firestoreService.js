@@ -1096,9 +1096,14 @@ export const firestoreService = {
 
     async getUserByPhone(phone) {
         if (!phone) return null;
-        const cleanPhone = phone.trim();
+        const cleanPhone = phone.toString().trim();
+        const raw10 = cleanPhone.replace(/\D/g, '').slice(-10);
         const users = this.getUsersSync();
-        const localUser = users.find(u => u.phone && u.phone.trim() === cleanPhone);
+        const localUser = users.find(u => {
+            if (!u.phone) return false;
+            const uPhone = u.phone.toString().trim();
+            return uPhone === cleanPhone || uPhone.replace(/\D/g, '').slice(-10) === raw10;
+        });
         if (localUser) return localUser;
 
         try {
@@ -1171,12 +1176,17 @@ export const firestoreService = {
 
     async updateUserPasswordByPhone(phone, newPassword) {
         if (!phone || !newPassword) throw new Error("Phone number and new password are required.");
-        const cleanPhone = phone.trim();
+        const cleanPhone = phone.toString().trim();
+        const raw10 = cleanPhone.replace(/\D/g, '').slice(-10);
         let matched = false;
 
         // 1. Update in Firestore users collection & local store
         const users = this.getUsersSync();
-        const userIdx = users.findIndex(u => u.phone === cleanPhone);
+        const userIdx = users.findIndex(u => {
+            if (!u.phone) return false;
+            const uPhone = u.phone.toString().trim();
+            return uPhone === cleanPhone || uPhone.replace(/\D/g, '').slice(-10) === raw10;
+        });
         if (userIdx !== -1) {
             users[userIdx].password = newPassword;
             users[userIdx].updatedAt = new Date().toISOString();
@@ -1192,7 +1202,11 @@ export const firestoreService = {
 
         // 2. Update Gym Owner password if matches gym owner phone
         const gyms = this.getGymsSync();
-        const gymIdx = gyms.findIndex(g => g.ownerPhone === cleanPhone);
+        const gymIdx = gyms.findIndex(g => {
+            if (!g.ownerPhone) return false;
+            const gPhone = g.ownerPhone.toString().trim();
+            return gPhone === cleanPhone || gPhone.replace(/\D/g, '').slice(-10) === raw10;
+        });
         if (gymIdx !== -1) {
             gyms[gymIdx].ownerPassword = newPassword;
             localStorage.setItem(STORAGE_KEYS.GYMS, JSON.stringify(gyms));
@@ -1204,7 +1218,11 @@ export const firestoreService = {
 
         // 3. Update Trainer password if matches trainer phone
         const trainers = this.getTrainersSync();
-        const trIdx = trainers.findIndex(t => t.phone === cleanPhone);
+        const trIdx = trainers.findIndex(t => {
+            if (!t.phone) return false;
+            const tPhone = t.phone.toString().trim();
+            return tPhone === cleanPhone || tPhone.replace(/\D/g, '').slice(-10) === raw10;
+        });
         if (trIdx !== -1) {
             trainers[trIdx].password = newPassword;
             localStorage.setItem(STORAGE_KEYS.TRAINERS, JSON.stringify(trainers));
@@ -1216,11 +1234,52 @@ export const firestoreService = {
 
         // 4. Update Registered Clients local store
         const clients = safeJsonParse(STORAGE_KEYS.REGISTERED_CLIENTS, []);
-        const cIdx = clients.findIndex(c => c.phone === cleanPhone);
+        const cIdx = clients.findIndex(c => {
+            if (!c.phone) return false;
+            const cPhone = c.phone.toString().trim();
+            return cPhone === cleanPhone || cPhone.replace(/\D/g, '').slice(-10) === raw10;
+        });
         if (cIdx !== -1) {
             clients[cIdx].password = newPassword;
             localStorage.setItem(STORAGE_KEYS.REGISTERED_CLIENTS, JSON.stringify(clients));
             matched = true;
+        }
+
+        emitDataSync();
+        return { success: true, matched };
+    },
+
+    async updateUserPasswordByEmail(email, newPassword) {
+        if (!email || !newPassword) throw new Error("Email and new password are required.");
+        const cleanEmail = email.toLowerCase().trim();
+        let matched = false;
+
+        // 1. Update in Firestore users collection & local store
+        const users = this.getUsersSync();
+        const userIdx = users.findIndex(u => u.email && u.email.toLowerCase().trim() === cleanEmail);
+        if (userIdx !== -1) {
+            users[userIdx].password = newPassword;
+            users[userIdx].updatedAt = new Date().toISOString();
+            localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
+            matched = true;
+            try {
+                await updateDoc(doc(db, "users", users[userIdx].uid), {
+                    password: newPassword,
+                    updatedAt: users[userIdx].updatedAt
+                });
+            } catch (e) {}
+        }
+
+        // 2. Update Gym Owner password if matches gym owner email
+        const gyms = this.getGymsSync();
+        const gymIdx = gyms.findIndex(g => g.ownerEmail && g.ownerEmail.toLowerCase().trim() === cleanEmail);
+        if (gymIdx !== -1) {
+            gyms[gymIdx].ownerPassword = newPassword;
+            localStorage.setItem(STORAGE_KEYS.GYMS, JSON.stringify(gyms));
+            matched = true;
+            try {
+                await updateDoc(doc(db, "gyms", gyms[gymIdx].gymId), { ownerPassword: newPassword });
+            } catch (e) {}
         }
 
         emitDataSync();

@@ -73,6 +73,8 @@ export const AuthModal = ({ setActiveTab, onOpenLegal }) => {
   const [confirmationResult, setConfirmationResult] = useState(null);
   const [fallbackOtp, setFallbackOtp] = useState('');
   const [verifiedPhone, setVerifiedPhone] = useState('');
+  const [verifiedFirebaseUser, setVerifiedFirebaseUser] = useState(null);
+  const [isOtpVerified, setIsOtpVerified] = useState(false);
   const [countdown, setCountdown] = useState(0);
 
   // Shared UI states
@@ -138,6 +140,8 @@ export const AuthModal = ({ setActiveTab, onOpenLegal }) => {
     setOtpCode('');
     setNewPassword('');
     setConfirmPassword('');
+    setVerifiedFirebaseUser(null);
+    setIsOtpVerified(false);
     const rawDigits = (identifier || ownerPhone || phone).replace(/\D/g, '');
     if (rawDigits.length === 10) {
       setResetPhone(rawDigits);
@@ -167,6 +171,8 @@ export const AuthModal = ({ setActiveTab, onOpenLegal }) => {
       setConfirmationResult(res.confirmationResult);
       setFallbackOtp(res.fallbackOtp || '123456');
       setVerifiedPhone(cleanPhone);
+      setVerifiedFirebaseUser(null);
+      setIsOtpVerified(false);
       setOtpStep('enter_otp');
       setCountdown(30);
       setSuccessMessage(res.message || `OTP sent to +91 ${cleanPhone}`);
@@ -177,7 +183,7 @@ export const AuthModal = ({ setActiveTab, onOpenLegal }) => {
     }
   };
 
-  // Step 2: Verify Entered OTP Code (Real-world verification)
+  // Step 2: Verify Entered OTP Code (Real-world verification with test fallback)
   const handleVerifyOtp = async (e) => {
     e.preventDefault();
     soundEffects.playClick();
@@ -193,15 +199,21 @@ export const AuthModal = ({ setActiveTab, onOpenLegal }) => {
     setLoading(true);
     try {
       let verified = false;
+      let confirmedFbUser = null;
+
       if (confirmationResult && typeof confirmationResult.confirm === 'function') {
         try {
-          await confirmationResult.confirm(cleanOtp);
-          verified = true;
+          const userCred = await confirmationResult.confirm(cleanOtp);
+          if (userCred?.user) {
+            verified = true;
+            confirmedFbUser = userCred.user;
+          }
         } catch (confirmErr) {
+          console.warn("Firebase OTP confirmation notice (evaluating test rescue fallback):", confirmErr?.code, confirmErr?.message);
           if (cleanOtp === (fallbackOtp || "123456") || cleanOtp === "123456") {
             verified = true;
           } else {
-            throw new Error("Invalid verification code. Please check your SMS or use test OTP 123456.");
+            throw new Error("Invalid verification code. Please check your SMS or enter test OTP 123456.");
           }
         }
       } else {
@@ -213,8 +225,10 @@ export const AuthModal = ({ setActiveTab, onOpenLegal }) => {
       }
 
       if (verified) {
+        setVerifiedFirebaseUser(confirmedFbUser);
+        setIsOtpVerified(true);
         setOtpStep('enter_new_password');
-        setSuccessMessage('Verification Successful! Now enter your new password.');
+        setSuccessMessage('Mobile verified successfully! Please set your new password.');
         soundEffects.playSuccessChime();
       }
     } catch (err) {
@@ -231,9 +245,10 @@ export const AuthModal = ({ setActiveTab, onOpenLegal }) => {
     soundEffects.playClick();
     resetFormState();
 
-    if (!resetEmail.trim() || !resetEmail.includes('@')) {
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!resetEmail.trim() || !emailRegex.test(resetEmail.trim().toLowerCase())) {
       soundEffects.playError();
-      setErrorMessage('Please enter a valid registered email address.');
+      setErrorMessage('Please enter a valid registered email address (e.g. name@example.com).');
       return;
     }
 
@@ -249,12 +264,18 @@ export const AuthModal = ({ setActiveTab, onOpenLegal }) => {
     }
   };
 
-
-  // Step 3: Save New Password and Update Firestore
+  // Step 3: Save New Password and Update Firestore & Firebase Auth
   const handleSaveNewPassword = async (e) => {
     e.preventDefault();
     soundEffects.playClick();
     resetFormState();
+
+    if (!isOtpVerified) {
+      soundEffects.playError();
+      setErrorMessage('Please verify your mobile number OTP first.');
+      setOtpStep('enter_otp');
+      return;
+    }
 
     if (!newPassword || newPassword.length < 6) {
       soundEffects.playError();
@@ -271,11 +292,9 @@ export const AuthModal = ({ setActiveTab, onOpenLegal }) => {
     setLoading(true);
     try {
       const res = await verifyOtpAndSetPassword({
-        confirmationResult,
-        fallbackOtp,
-        otpCode,
-        newPassword,
-        phone: verifiedPhone
+        phone: verifiedPhone,
+        newPassword: newPassword,
+        firebaseUser: verifiedFirebaseUser
       });
 
       setSuccessMessage(res.message || 'Password successfully updated!');
@@ -331,28 +350,47 @@ export const AuthModal = ({ setActiveTab, onOpenLegal }) => {
     // =========================================================
     if (persona === 'client') {
       if (authMode === 'register') {
-        if (!name.trim()) {
+        const cleanClientName = name.trim();
+        const cleanClientEmail = email.trim();
+        const cleanClientPhone = phone.replace(/\D/g, '').slice(-10);
+
+        if (!cleanClientName || cleanClientName.length < 2) {
           soundEffects.playError();
-          setErrorMessage('Please enter your full name.');
+          setErrorMessage('Please enter your full name (minimum 2 characters).');
           return;
         }
-        if (!email.trim() && !phone.trim()) {
+
+        if (!cleanClientEmail && !cleanClientPhone) {
           soundEffects.playError();
-          setErrorMessage('Please provide either an Email or Phone Number.');
+          setErrorMessage('Please provide either an Email Address or 10-digit Phone Number.');
           return;
         }
+
+        const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+        if (cleanClientEmail && !emailRegex.test(cleanClientEmail.toLowerCase())) {
+          soundEffects.playError();
+          setErrorMessage('Please enter a valid email address format (e.g. name@example.com).');
+          return;
+        }
+
+        if (cleanClientPhone && cleanClientPhone.length !== 10) {
+          soundEffects.playError();
+          setErrorMessage('Please enter a valid 10-digit mobile number.');
+          return;
+        }
+
         if (!password || password.length < 6) {
           soundEffects.playError();
-          setErrorMessage('Password must be at least 6 characters.');
+          setErrorMessage('Password must be at least 6 characters long.');
           return;
         }
 
         setLoading(true);
         try {
-          const primaryId = email.trim() || phone.trim();
-          const res = await register(name, primaryId, password, { 
-            email: email.trim(), 
-            phone: phone.trim(), 
+          const primaryId = cleanClientEmail || cleanClientPhone;
+          const res = await register(cleanClientName, primaryId, password, { 
+            email: cleanClientEmail ? cleanClientEmail.toLowerCase() : "", 
+            phone: cleanClientPhone, 
             role: 'client' 
           });
           
@@ -389,7 +427,7 @@ export const AuthModal = ({ setActiveTab, onOpenLegal }) => {
           setActiveTab('home');
         }
       } catch (err) {
-        setErrorMessage(err.message || 'Incorrect credentials or account not found.');
+        setErrorMessage(err.message || 'Incorrect email address or password. Please check your credentials.');
       } finally {
         setLoading(false);
       }
@@ -401,35 +439,41 @@ export const AuthModal = ({ setActiveTab, onOpenLegal }) => {
     // =========================================================
     if (persona === 'gym_owner') {
       if (authMode === 'register') {
-        if (!ownerName.trim()) {
+        const cleanOwner = ownerName.trim();
+        const cleanGym = gymName.trim();
+        const cleanLoc = location.trim();
+        const cleanEmail = ownerEmail.trim();
+        const cleanPhone = ownerPhone.replace(/\D/g, '').slice(-10);
+
+        if (!cleanOwner || cleanOwner.length < 2) {
           soundEffects.playError();
-          setErrorMessage('Please enter the Gym Owner / Manager name.');
+          setErrorMessage('Please enter the Gym Owner / Manager name (minimum 2 characters).');
           return;
         }
-        if (!gymName.trim()) {
+        if (!cleanGym || cleanGym.length < 2) {
           soundEffects.playError();
-          setErrorMessage('Please enter your Gym or Fitness Studio name.');
+          setErrorMessage('Please enter your Gym Facility or Fitness Studio name.');
           return;
         }
-        if (!location.trim()) {
+        if (!cleanLoc) {
           soundEffects.playError();
           setErrorMessage('Please enter your Gym Area / City (e.g. Madhapur, Hyderabad).');
           return;
         }
-        const cleanOwnerPhone = ownerPhone.replace(/\D/g, '').slice(-10);
-        if (cleanOwnerPhone.length !== 10) {
+        if (cleanPhone.length !== 10) {
           soundEffects.playError();
           setErrorMessage('Please enter a valid 10-digit mobile number for booking alerts & UPI payouts.');
           return;
         }
-        if (!ownerEmail.trim()) {
+        const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+        if (!cleanEmail || !emailRegex.test(cleanEmail.toLowerCase())) {
           soundEffects.playError();
-          setErrorMessage('Please enter your Gym Owner email address.');
+          setErrorMessage('Please enter a valid business email address format (e.g. partner@gsfitness.com).');
           return;
         }
         if (!ownerPassword || ownerPassword.length < 6) {
           soundEffects.playError();
-          setErrorMessage('Password must be at least 6 characters.');
+          setErrorMessage('Password must be at least 6 characters long.');
           return;
         }
         if (ownerPassword !== ownerConfirmPassword) {
@@ -446,11 +490,11 @@ export const AuthModal = ({ setActiveTab, onOpenLegal }) => {
           try {
             setLoading(true);
             const res = await registerGymOwner(
-              ownerName.trim(),
-              gymName.trim(),
-              location.trim(),
-              cleanOwnerPhone,
-              ownerEmail.trim(),
+              cleanOwner,
+              cleanGym,
+              cleanLoc,
+              cleanPhone,
+              cleanEmail.toLowerCase(),
               ownerPassword,
               '',
               paymentData
@@ -479,10 +523,10 @@ export const AuthModal = ({ setActiveTab, onOpenLegal }) => {
         setLoading(true);
         razorpayService.openGymRegistrationCheckout({
           amount: payableAmount,
-          gymName: gymName.trim(),
-          ownerName: ownerName.trim(),
-          ownerPhone: cleanOwnerPhone,
-          ownerEmail: ownerEmail.trim(),
+          gymName: cleanGym,
+          ownerName: cleanOwner,
+          ownerPhone: cleanPhone,
+          ownerEmail: cleanEmail.toLowerCase(),
           couponCode: appliedCoupon?.code || null,
           onSuccess: async (rzpRes) => {
             soundEffects.playSuccessChime();

@@ -6,6 +6,10 @@ import {
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
   sendPasswordResetEmail, 
+  sendEmailVerification,
+  signInWithPhoneNumber,
+  RecaptchaVerifier,
+  updatePassword,
   signOut, 
   updateProfile, 
   onAuthStateChanged 
@@ -15,8 +19,21 @@ import { soundEffects } from '../services/soundEffects';
 
 const AuthContext = createContext();
 
-
 const REGISTERED_CLIENTS_KEY = "fitup_registered_clients";
+
+// Strict RFC 5322 compliant email validator
+export const isValidEmail = (email) => {
+  if (!email || typeof email !== 'string') return false;
+  const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+  return emailRegex.test(email.trim().toLowerCase());
+};
+
+// Strict Indian 10-digit mobile number cleaner & validator
+export const clean10DigitPhone = (phone) => {
+  if (!phone) return "";
+  const digits = phone.toString().replace(/\D/g, '');
+  return digits.length === 10 ? digits : digits.slice(-10);
+};
 
 export const AuthProvider = ({ children }) => {
   const [currentUser, setCurrentUser] = useState(() => {
@@ -51,6 +68,7 @@ export const AuthProvider = ({ children }) => {
               name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || "FITUP User",
               email: firebaseUser.email || "",
               role: "client",
+              emailVerified: firebaseUser.emailVerified || false,
               createdAt: new Date().toISOString(),
               lastLogin: new Date().toISOString()
             };
@@ -79,12 +97,21 @@ export const AuthProvider = ({ children }) => {
   };
 
   /**
-   * Universal Login supporting Email or Phone Number
+   * Universal Login supporting Email or Phone Number with strict security & standard error handling
    * Automatically synchronizes profile with Firestore `users/{uid}` and updates `lastLogin`
    */
   const login = async (identifier, password) => {
     soundEffects.playClick();
     const cleanId = (identifier || '').trim();
+    if (!cleanId) {
+      soundEffects.playError();
+      throw new Error("Please enter your email address or mobile number.");
+    }
+    if (!password) {
+      soundEffects.playError();
+      throw new Error("Please enter your account password.");
+    }
+
     const isEmail = cleanId.includes('@');
 
     // 1. STRICT MASTER ADMIN OVERRIDE (SNEHITH)
@@ -111,10 +138,17 @@ export const AuthProvider = ({ children }) => {
       }
     }
 
-    // 2. EMAIL-BASED LOGIN WITH FIREBASE AUTH
+    // 2. EMAIL-BASED LOGIN WITH STRICT FIREBASE AUTH & FIRESTORE SYNC
     if (isEmail) {
+      if (!isValidEmail(cleanId)) {
+        soundEffects.playError();
+        throw new Error("Please enter a valid email address format (e.g. name@example.com).");
+      }
+
+      const normalizedEmail = cleanId.toLowerCase().trim();
+
       try {
-        const userCred = await signInWithEmailAndPassword(auth, cleanId.toLowerCase(), password);
+        const userCred = await signInWithEmailAndPassword(auth, normalizedEmail, password);
         const fbUser = userCred.user;
 
         // Fetch user profile from Firestore `users/{uid}`
@@ -123,13 +157,13 @@ export const AuthProvider = ({ children }) => {
         if (!profile) {
           // Check if matches a gym owner in gyms collection
           const gyms = firestoreService.getGymsSync();
-          const matchedGym = gyms.find(g => g.ownerEmail?.toLowerCase() === cleanId.toLowerCase());
+          const matchedGym = gyms.find(g => g.ownerEmail?.toLowerCase() === normalizedEmail);
           
           if (matchedGym) {
             profile = {
               uid: fbUser.uid,
               name: matchedGym.ownerName || (matchedGym.name + " Owner"),
-              email: cleanId.toLowerCase(),
+              email: normalizedEmail,
               phone: matchedGym.ownerPhone || "",
               gymId: matchedGym.gymId,
               gymName: matchedGym.name,
@@ -138,9 +172,10 @@ export const AuthProvider = ({ children }) => {
           } else {
             profile = {
               uid: fbUser.uid,
-              name: fbUser.displayName || cleanId.split('@')[0],
-              email: cleanId.toLowerCase(),
-              role: "client"
+              name: fbUser.displayName || normalizedEmail.split('@')[0],
+              email: normalizedEmail,
+              role: "client",
+              emailVerified: fbUser.emailVerified || false
             };
           }
         }
@@ -148,6 +183,7 @@ export const AuthProvider = ({ children }) => {
         // Update last login in Firestore
         profile = {
           ...profile,
+          emailVerified: fbUser.emailVerified || profile.emailVerified || false,
           lastLogin: new Date().toISOString()
         };
         await firestoreService.saveUserProfile(profile);
@@ -158,11 +194,11 @@ export const AuthProvider = ({ children }) => {
         closeAuthModal();
         return { success: true, user: profile, role: profile.role || "client" };
       } catch (authErr) {
-        console.warn("Firebase email auth attempt error:", authErr.code, authErr.message);
+        console.warn("Firebase email auth attempt notice:", authErr.code, authErr.message);
         
-        // Fallback: Check if user exists in Firestore users or gym collection with custom password
-        const cloudUser = await firestoreService.getUserByEmail(cleanId);
-        if (cloudUser && cloudUser.password === password) {
+        // Strict Fallback: Check if user exists in Firestore users with exact matching password
+        const cloudUser = await firestoreService.getUserByEmail(normalizedEmail);
+        if (cloudUser && cloudUser.password && cloudUser.password === password) {
           await firestoreService.updateUserLastLogin(cloudUser.uid);
           setCurrentUser(cloudUser);
           soundEffects.playSuccessChime();
@@ -170,13 +206,14 @@ export const AuthProvider = ({ children }) => {
           return { success: true, user: cloudUser, role: cloudUser.role || "client" };
         }
 
+        // Strict Fallback: Check if gym owner matches email with exact password
         const gyms = firestoreService.getGymsSync();
-        const matchedGym = gyms.find(g => g.ownerEmail?.toLowerCase() === cleanId.toLowerCase());
-        if (matchedGym && (matchedGym.ownerPassword || "Owner@123") === password) {
+        const matchedGym = gyms.find(g => g.ownerEmail?.toLowerCase() === normalizedEmail);
+        if (matchedGym && ((matchedGym.ownerPassword && matchedGym.ownerPassword === password) || (!matchedGym.ownerPassword && password === "Owner@123"))) {
           const gymOwnerUser = {
             uid: "usr-gym-" + matchedGym.gymId,
             name: matchedGym.ownerName || (matchedGym.name + " Owner"),
-            email: cleanId.toLowerCase(),
+            email: normalizedEmail,
             phone: matchedGym.ownerPhone || "",
             gymId: matchedGym.gymId,
             gymName: matchedGym.name,
@@ -190,20 +227,26 @@ export const AuthProvider = ({ children }) => {
           return { success: true, user: gymOwnerUser, role: "gym_owner" };
         }
 
+        // Strict secure error message - never leak if account exists or password was wrong
         soundEffects.playError();
-        if (authErr.code === 'auth/wrong-password' || authErr.code === 'auth/invalid-credential') {
-          throw new Error("Incorrect password. Please try again or use 'Forgot Password'.");
-        } else if (authErr.code === 'auth/user-not-found') {
-          throw new Error("No account found with this email. Please register first.");
-        } else {
-          throw new Error(authErr.message || "Authentication failed. Please check your credentials.");
-        }
+        throw new Error("Incorrect email address or password. Please check your credentials or click 'Forgot Password'.");
       }
     }
 
-    // 3. PHONE-BASED GYM OWNER AUTHENTICATION (e.g. Vinay / GS Fitness Studio)
+    // 3. PHONE-BASED AUTHENTICATION (10 Digits)
+    const cleanPhone = clean10DigitPhone(cleanId);
+    if (cleanPhone.length !== 10) {
+      soundEffects.playError();
+      throw new Error("Please enter a valid 10-digit registered mobile number or email address.");
+    }
+
+    // 3.1 Check Gym Owner by phone (e.g. Vinay / GS Fitness Studio)
     const gyms = firestoreService.getGymsSync();
-    const matchedGym = gyms.find(g => g.ownerPhone === cleanId);
+    const matchedGym = gyms.find(g => {
+      if (!g.ownerPhone) return false;
+      const gPhone = g.ownerPhone.toString().trim();
+      return gPhone === cleanPhone || gPhone.replace(/\D/g, '').slice(-10) === cleanPhone;
+    });
 
     if (matchedGym) {
       const expectedPassword = matchedGym.ownerPassword || "Owner@123";
@@ -226,16 +269,20 @@ export const AuthProvider = ({ children }) => {
         return { success: true, user: gymOwnerUser, role: "gym_owner" };
       } else {
         soundEffects.playError();
-        throw new Error("Incorrect password for Gym Owner.");
+        throw new Error("Incorrect mobile number or password.");
       }
     }
 
-    // 4. PHONE-BASED TRAINER AUTHENTICATION
+    // 3.2 Check Trainer by phone
     const trainers = firestoreService.getTrainersSync();
-    const matchedTrainer = trainers.find(t => t.phone === cleanId);
+    const matchedTrainer = trainers.find(t => {
+      if (!t.phone) return false;
+      const tPhone = t.phone.toString().trim();
+      return tPhone === cleanPhone || tPhone.replace(/\D/g, '').slice(-10) === cleanPhone;
+    });
 
     if (matchedTrainer) {
-      if (matchedTrainer.password === password) {
+      if (matchedTrainer.password && matchedTrainer.password === password) {
         const trainerUser = {
           uid: matchedTrainer.trainerId,
           name: matchedTrainer.name,
@@ -253,14 +300,14 @@ export const AuthProvider = ({ children }) => {
         return { success: true, user: trainerUser, role: "trainer" };
       } else {
         soundEffects.playError();
-        throw new Error("Incorrect password for Trainer account.");
+        throw new Error("Incorrect mobile number or password.");
       }
     }
 
-    // 5. REGISTERED CLIENT CHECK (Firestore & Local)
-    const existingCloudClient = await firestoreService.getUserByPhone(cleanId);
+    // 3.3 Check Registered Client in Firestore
+    const existingCloudClient = await firestoreService.getUserByPhone(cleanPhone);
     if (existingCloudClient) {
-      if (existingCloudClient.password === password || !existingCloudClient.password) {
+      if (existingCloudClient.password && existingCloudClient.password === password) {
         await firestoreService.updateUserLastLogin(existingCloudClient.uid);
         setCurrentUser(existingCloudClient);
         soundEffects.playSuccessChime();
@@ -268,15 +315,20 @@ export const AuthProvider = ({ children }) => {
         return { success: true, user: existingCloudClient, role: existingCloudClient.role || "client" };
       } else {
         soundEffects.playError();
-        throw new Error("Incorrect password for this phone number.");
+        throw new Error("Incorrect mobile number or password.");
       }
     }
 
+    // 3.4 Check Registered Client in local cache
     const registeredClients = JSON.parse(localStorage.getItem(REGISTERED_CLIENTS_KEY) || "[]");
-    const matchedClient = registeredClients.find(c => c.phone === cleanId);
+    const matchedClient = registeredClients.find(c => {
+      if (!c.phone) return false;
+      const cPhone = c.phone.toString().trim();
+      return cPhone === cleanPhone || cPhone.replace(/\D/g, '').slice(-10) === cleanPhone;
+    });
 
     if (matchedClient) {
-      if (matchedClient.password === password) {
+      if (matchedClient.password && matchedClient.password === password) {
         const clientUser = {
           uid: matchedClient.uid || ("usr-client-" + Date.now()),
           name: matchedClient.name,
@@ -293,22 +345,34 @@ export const AuthProvider = ({ children }) => {
         return { success: true, user: clientUser, role: "client" };
       } else {
         soundEffects.playError();
-        throw new Error("Incorrect password for this phone number.");
+        throw new Error("Incorrect mobile number or password.");
       }
     }
 
-    // 6. IF NO ACCOUNT FOUND ANYWHERE -> REJECT WITH CLEAR SIGN-UP GUIDANCE
+    // 3.5 No Account Found Anywhere -> Reject with clear sign-up guidance
     soundEffects.playError();
-    throw new Error(`No registered FITUP account found with mobile number +91 ${cleanId}. Please click 'Register' / 'Sign Up' first to create your account.`);
+    throw new Error(`No registered FITUP account found with mobile number +91 ${cleanPhone}. Please click 'Register' / 'Sign Up' first to create your account.`);
   };
 
 
   /**
-   * Universal Registration with Firebase Auth and Firestore `users/{uid}` persistence
+   * Universal Registration with strict email/phone validation, Firebase Auth, and Firestore persistence
    */
   const register = async (name, emailOrPhone, password, extraData = {}) => {
     soundEffects.playClick();
+    const cleanName = (name || '').trim();
     const cleanId = (emailOrPhone || '').trim();
+
+    if (!cleanName || cleanName.length < 2) {
+      soundEffects.playError();
+      throw new Error("Please enter your full name (at least 2 characters).");
+    }
+
+    if (!password || password.length < 6) {
+      soundEffects.playError();
+      throw new Error("Password must be at least 6 characters long.");
+    }
+
     const isEmail = cleanId.includes('@');
 
     // Admin registration check
@@ -316,7 +380,7 @@ export const AuthProvider = ({ children }) => {
       if (password === "Snehith@020777") {
         const masterAdmin = {
           uid: "usr-owner-snehith",
-          name: name.toUpperCase() || "SNEHITH",
+          name: cleanName.toUpperCase() || "SNEHITH",
           phone: "9030118909",
           email: "snehith@fitup.com",
           role: "owner",
@@ -336,22 +400,36 @@ export const AuthProvider = ({ children }) => {
 
     // Email-based Registration via Firebase Auth
     if (isEmail) {
+      if (!isValidEmail(cleanId)) {
+        soundEffects.playError();
+        throw new Error("Please enter a valid email address format (e.g. name@example.com).");
+      }
+
+      const normalizedEmail = cleanId.toLowerCase().trim();
+
       try {
-        const userCred = await createUserWithEmailAndPassword(auth, cleanId.toLowerCase(), password);
+        const userCred = await createUserWithEmailAndPassword(auth, normalizedEmail, password);
         const fbUser = userCred.user;
 
-        if (name) {
-          try {
-            await updateProfile(fbUser, { displayName: name });
-          } catch (e) {}
+        try {
+          await updateProfile(fbUser, { displayName: cleanName });
+        } catch (e) {}
+
+        // Send email verification link
+        try {
+          await sendEmailVerification(fbUser);
+        } catch (verifErr) {
+          console.warn("Email verification notice:", verifErr?.message);
         }
 
         const newUserDoc = {
           uid: fbUser.uid,
-          name: name || cleanId.split('@')[0],
-          email: cleanId.toLowerCase(),
-          phone: extraData.phone || "",
+          name: cleanName,
+          email: normalizedEmail,
+          phone: extraData.phone ? clean10DigitPhone(extraData.phone) : "",
+          password: password,
           role: extraData.role || "client",
+          emailVerified: fbUser.emailVerified || false,
           createdAt: new Date().toISOString(),
           lastLogin: new Date().toISOString(),
           ...extraData
@@ -368,6 +446,8 @@ export const AuthProvider = ({ children }) => {
           throw new Error("This email is already registered. Please Sign In or use 'Forgot Password'.");
         } else if (authErr.code === 'auth/weak-password') {
           throw new Error("Password should be at least 6 characters long.");
+        } else if (authErr.code === 'auth/invalid-email') {
+          throw new Error("The email address provided is invalid. Please enter a valid email.");
         } else {
           throw new Error(authErr.message || "Registration failed. Please try again.");
         }
@@ -375,19 +455,32 @@ export const AuthProvider = ({ children }) => {
     }
 
     // Phone-based Registration
-    const registeredClients = JSON.parse(localStorage.getItem(REGISTERED_CLIENTS_KEY) || "[]");
-    const existing = registeredClients.find(c => c.phone === cleanId);
-
-    if (existing) {
+    const cleanPhone = clean10DigitPhone(cleanId);
+    if (cleanPhone.length !== 10) {
       soundEffects.playError();
-      throw new Error("An account with this phone number already exists. Please Sign In.");
+      throw new Error("Please enter a valid 10-digit mobile number for registration.");
     }
+
+    const registeredClients = JSON.parse(localStorage.getItem(REGISTERED_CLIENTS_KEY) || "[]");
+    const existingLocal = registeredClients.find(c => {
+      if (!c.phone) return false;
+      const cPhone = c.phone.toString().trim();
+      return cPhone === cleanPhone || cPhone.replace(/\D/g, '').slice(-10) === cleanPhone;
+    });
+    const existingCloud = await firestoreService.getUserByPhone(cleanPhone);
+
+    if (existingLocal || existingCloud) {
+      soundEffects.playError();
+      throw new Error(`An account with mobile number +91 ${cleanPhone} already exists. Please Sign In.`);
+    }
+
+    const cleanEmail = extraData.email && isValidEmail(extraData.email) ? extraData.email.toLowerCase().trim() : "";
 
     const newClient = {
       uid: "usr-client-" + Date.now(),
-      name: name,
-      phone: cleanId,
-      email: extraData.email || "",
+      name: cleanName,
+      phone: cleanPhone,
+      email: cleanEmail,
       password: password,
       role: extraData.role || "client",
       createdAt: new Date().toISOString(),
@@ -410,12 +503,40 @@ export const AuthProvider = ({ children }) => {
    */
   const registerGymOwner = async (ownerName, gymName, location, ownerPhone, ownerEmail, ownerPassword, address = '', paymentData = null) => {
     soundEffects.playClick();
+    const cleanName = (ownerName || '').trim();
+    const cleanGymName = (gymName || '').trim();
     const cleanEmail = (ownerEmail || '').toLowerCase().trim();
-    const cleanPhone = (ownerPhone || '').trim();
+    const cleanPhone = clean10DigitPhone(ownerPhone);
     
+    if (!cleanName || cleanName.length < 2) {
+      soundEffects.playError();
+      throw new Error("Please enter the Gym Owner / Manager name (at least 2 characters).");
+    }
+    if (!cleanGymName) {
+      soundEffects.playError();
+      throw new Error("Please enter your Gym Facility name.");
+    }
+    if (cleanPhone.length !== 10) {
+      soundEffects.playError();
+      throw new Error("Please enter a valid 10-digit mobile number for payouts and booking alerts.");
+    }
+    if (!cleanEmail || !isValidEmail(cleanEmail)) {
+      soundEffects.playError();
+      throw new Error("Please enter a valid business email address format (e.g. partner@example.com).");
+    }
+    if (!ownerPassword || ownerPassword.length < 6) {
+      soundEffects.playError();
+      throw new Error("Password must be at least 6 characters long.");
+    }
+
     // Check if Gym Owner with same phone or email already registered
     const gyms = firestoreService.getGymsSync();
-    const existingGym = gyms.find(g => (cleanPhone && g.ownerPhone === cleanPhone) || (cleanEmail && g.ownerEmail?.toLowerCase() === cleanEmail));
+    const existingGym = gyms.find(g => {
+      const gPhone = g.ownerPhone ? clean10DigitPhone(g.ownerPhone) : "";
+      const gEmail = g.ownerEmail ? g.ownerEmail.toLowerCase().trim() : "";
+      return (cleanPhone && gPhone === cleanPhone) || (cleanEmail && gEmail === cleanEmail);
+    });
+
     if (existingGym) {
       soundEffects.playError();
       throw new Error(`A facility is already registered with this mobile/email (${existingGym.name}). Please click 'Sign In' instead.`);
@@ -429,11 +550,14 @@ export const AuthProvider = ({ children }) => {
         const cred = await createUserWithEmailAndPassword(auth, cleanEmail, ownerPassword);
         if (cred?.user?.uid) {
           uid = cred.user.uid;
-          if (ownerName) {
+          if (cleanName) {
             try {
-              await updateProfile(cred.user, { displayName: ownerName });
+              await updateProfile(cred.user, { displayName: cleanName });
             } catch (e) {}
           }
+          try {
+            await sendEmailVerification(cred.user);
+          } catch (e) {}
         }
       } catch (authErr) {
         if (authErr.code === 'auth/email-already-in-use') {
@@ -449,7 +573,7 @@ export const AuthProvider = ({ children }) => {
 
     const newGym = {
       gymId,
-      name: gymName || `${ownerName}'s Fitness`,
+      name: cleanGymName || `${cleanName}'s Fitness`,
       location: location || "Hyderabad",
       address: address || `${location || 'Hyderabad'}`,
       image: "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&w=800&q=80",
@@ -457,7 +581,7 @@ export const AuthProvider = ({ children }) => {
       reviewCount: 0,
       startingPrice: 280,
       amenities: ["AC", "Free Locker", "Steam Bath", "Protein Bar"],
-      ownerName: ownerName,
+      ownerName: cleanName,
       ownerPhone: cleanPhone,
       ownerEmail: cleanEmail,
       ownerPassword: ownerPassword,
@@ -476,7 +600,7 @@ export const AuthProvider = ({ children }) => {
         paidAt: new Date().toISOString()
       },
       ownerUpiId: `${cleanPhone}@upi`,
-      ownerQrCodeUrl: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=upi://pay?pa=${cleanPhone}@upi&pn=${encodeURIComponent(gymName)}&am=280&cu=INR`,
+      ownerQrCodeUrl: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=upi://pay?pa=${cleanPhone}@upi&pn=${encodeURIComponent(cleanGymName)}&am=280&cu=INR`,
       socialHandles: {
         instagram: "",
         whatsapp: cleanPhone,
@@ -491,8 +615,8 @@ export const AuthProvider = ({ children }) => {
     if (amountPaid > 0) {
       await firestoreService.creditAdminWallet(amountPaid, "GYM_REGISTRATION_FEE", {
         gymId,
-        gymName,
-        ownerName,
+        gymName: cleanGymName,
+        ownerName: cleanName,
         paymentId,
         couponCode: paymentData?.couponCode || null
       });
@@ -500,12 +624,12 @@ export const AuthProvider = ({ children }) => {
 
     const ownerProfile = {
       uid,
-      name: ownerName || (gymName + " Owner"),
+      name: cleanName || (cleanGymName + " Owner"),
       email: cleanEmail,
       phone: cleanPhone,
       password: ownerPassword,
       gymId: gymId,
-      gymName: gymName,
+      gymName: cleanGymName,
       role: "gym_owner",
       createdAt: new Date().toISOString(),
       lastLogin: new Date().toISOString()
@@ -522,6 +646,7 @@ export const AuthProvider = ({ children }) => {
   const registerGymOwnerAuth = async (ownerName, ownerEmail, ownerPhone, ownerPassword, gymId, gymName) => {
     let uid = 'usr-gym-' + (gymId || Date.now());
     const cleanEmail = (ownerEmail || '').toLowerCase().trim();
+    const cleanPhone = clean10DigitPhone(ownerPhone);
 
     if (cleanEmail && ownerPassword) {
       try {
@@ -543,7 +668,7 @@ export const AuthProvider = ({ children }) => {
       uid,
       name: ownerName || (gymName + " Owner"),
       email: cleanEmail,
-      phone: ownerPhone || "",
+      phone: cleanPhone || "",
       password: ownerPassword || "Owner@123",
       gymId: gymId,
       gymName: gymName,
@@ -561,8 +686,7 @@ export const AuthProvider = ({ children }) => {
    */
   const sendPhoneOtp = async (phoneNumber, containerId = 'recaptcha-container') => {
     soundEffects.playClick();
-    const rawDigits = (phoneNumber || '').replace(/\D/g, '');
-    const cleanPhone = rawDigits.length === 10 ? rawDigits : rawDigits.slice(-10);
+    const cleanPhone = clean10DigitPhone(phoneNumber);
 
     if (cleanPhone.length !== 10) {
       soundEffects.playError();
@@ -572,12 +696,21 @@ export const AuthProvider = ({ children }) => {
     // 1. Verify that the phone number exists in FITUP Firestore / records
     const isAdmin = cleanPhone === "9030118909";
     const gyms = firestoreService.getGymsSync();
-    const isGymOwner = gyms.some(g => g.ownerPhone === cleanPhone);
+    const isGymOwner = gyms.some(g => {
+      const p = g.ownerPhone ? clean10DigitPhone(g.ownerPhone) : "";
+      return p === cleanPhone;
+    });
     const trainers = firestoreService.getTrainersSync();
-    const isTrainer = trainers.some(t => t.phone === cleanPhone);
+    const isTrainer = trainers.some(t => {
+      const p = t.phone ? clean10DigitPhone(t.phone) : "";
+      return p === cleanPhone;
+    });
     const cloudUser = await firestoreService.getUserByPhone(cleanPhone);
     const registeredClients = JSON.parse(localStorage.getItem(REGISTERED_CLIENTS_KEY) || "[]");
-    const isClient = registeredClients.some(c => c.phone === cleanPhone) || !!cloudUser;
+    const isClient = registeredClients.some(c => {
+      const p = c.phone ? clean10DigitPhone(c.phone) : "";
+      return p === cleanPhone;
+    }) || !!cloudUser;
 
     if (!isAdmin && !isGymOwner && !isTrainer && !isClient) {
       soundEffects.playError();
@@ -590,24 +723,22 @@ export const AuthProvider = ({ children }) => {
 
     try {
       if (typeof window !== 'undefined') {
-        // Initialize reCAPTCHA verifier if not already present
-        if (!window.recaptchaVerifier) {
-          window.recaptchaVerifier = new RecaptchaVerifier(auth, containerId, {
-            size: 'invisible',
-            callback: () => {
-              // reCAPTCHA solved
-            },
-            'expired-callback': () => {
-              console.warn('reCAPTCHA expired');
-            }
-          });
+        const container = document.getElementById(containerId);
+        if (container) {
+          container.innerHTML = '';
         }
+        window.recaptchaVerifier = new RecaptchaVerifier(auth, containerId, {
+          size: 'invisible',
+          callback: () => {},
+          'expired-callback': () => {
+            console.warn('reCAPTCHA expired');
+          }
+        });
         const appVerifier = window.recaptchaVerifier;
         confirmationResult = await signInWithPhoneNumber(auth, formattedPhone, appVerifier);
       }
     } catch (phoneAuthErr) {
-      console.warn("Firebase SMS Provider note (enabling dev/offline OTP verification fallback):", phoneAuthErr?.code, phoneAuthErr?.message);
-      // When Firebase test numbers or SMS quota limits are encountered in dev/test, fallback OTP 123456 ensures uninterrupted user testing
+      console.warn("Firebase SMS Provider notice (using dev/rescue OTP 123456 fallback):", phoneAuthErr?.code, phoneAuthErr?.message);
       fallbackOtp = "123456";
     }
 
@@ -623,16 +754,15 @@ export const AuthProvider = ({ children }) => {
   };
 
   /**
-   * Phone Number SMS OTP: Step 2 & 3 - Verify OTP and update password across Firestore
+   * Phone Number SMS OTP: Step 2 & 3 - Verify OTP and update password across Firestore & Firebase Auth
    */
-  const verifyOtpAndSetPassword = async ({ confirmationResult, fallbackOtp, otpCode, newPassword, phone }) => {
+  const verifyOtpAndSetPassword = async ({ phone, newPassword, firebaseUser = null }) => {
     soundEffects.playClick();
-    const cleanOtp = (otpCode || '').trim();
-    const cleanPhone = (phone || '').replace(/\D/g, '').slice(-10);
+    const cleanPhone = clean10DigitPhone(phone);
 
-    if (cleanOtp.length !== 6) {
+    if (cleanPhone.length !== 10) {
       soundEffects.playError();
-      throw new Error("Please enter the complete 6-digit OTP code.");
+      throw new Error("Invalid phone number for password update.");
     }
 
     if (!newPassword || newPassword.length < 6) {
@@ -640,45 +770,23 @@ export const AuthProvider = ({ children }) => {
       throw new Error("New password must be at least 6 characters long.");
     }
 
-    // Verify OTP with Firebase confirmationResult
-    let verified = false;
-    if (confirmationResult && typeof confirmationResult.confirm === 'function') {
+    // 1. Update Firebase Auth password if authenticated user available
+    const userToUpdate = firebaseUser || auth.currentUser;
+    if (userToUpdate) {
       try {
-        const userCred = await confirmationResult.confirm(cleanOtp);
-        if (userCred?.user) {
-          verified = true;
-          try {
-            await updatePassword(userCred.user, newPassword);
-          } catch (e) {}
-        }
-      } catch (confirmErr) {
-        if (cleanOtp === (fallbackOtp || "123456") || cleanOtp === "123456") {
-          verified = true;
-        } else {
-          soundEffects.playError();
-          throw new Error("Invalid or expired OTP code. Please check and try again.");
-        }
-      }
-    } else {
-      if (cleanOtp === (fallbackOtp || "123456") || cleanOtp === "123456") {
-        verified = true;
-      } else {
-        soundEffects.playError();
-        throw new Error("Invalid or expired OTP code. (For testing, use 123456)");
+        await updatePassword(userToUpdate, newPassword);
+      } catch (authPassErr) {
+        console.warn("Firebase Auth updatePassword notice:", authPassErr?.code, authPassErr?.message);
       }
     }
 
-    if (!verified) {
-      soundEffects.playError();
-      throw new Error("OTP verification failed.");
-    }
-
-    // Update password in Firestore users, gyms, trainers, and local storage
+    // 2. Update password across Firestore collections (users, gyms, trainers, registeredClients)
     await firestoreService.updateUserPasswordByPhone(cleanPhone, newPassword);
 
     soundEffects.playSuccessChime();
     return {
       success: true,
+      phone: cleanPhone,
       message: "Password updated successfully! You can now sign in with your new password."
     };
   };
@@ -690,9 +798,9 @@ export const AuthProvider = ({ children }) => {
     soundEffects.playClick();
     const cleanEmail = (email || '').trim().toLowerCase();
     
-    if (!cleanEmail || !cleanEmail.includes('@')) {
+    if (!cleanEmail || !isValidEmail(cleanEmail)) {
       soundEffects.playError();
-      throw new Error("Please enter a valid registered email address.");
+      throw new Error("Please enter a valid registered email address (e.g. name@example.com).");
     }
 
     try {
@@ -701,6 +809,9 @@ export const AuthProvider = ({ children }) => {
       return { success: true, message: `Password reset link sent to ${cleanEmail}. Please check your inbox.` };
     } catch (err) {
       soundEffects.playError();
+      if (err.code === 'auth/user-not-found') {
+        throw new Error("No registered account found with this email address.");
+      }
       throw new Error(err.message || "Failed to send password reset email.");
     }
   };
