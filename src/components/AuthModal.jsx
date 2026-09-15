@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { soundEffects } from '../services/soundEffects';
 import { firestoreService } from '../services/firestoreService';
 import { razorpayService } from '../services/razorpayService';
+import { customOtpService } from '../services/customOtpService';
 import { 
   Eye, EyeOff, Lock, Phone, Mail, User, X, 
   ShieldCheck, AlertCircle, CheckCircle2, ArrowLeft, 
@@ -183,7 +184,7 @@ export const AuthModal = ({ setActiveTab, onOpenLegal }) => {
     }
   };
 
-  // Step 2: Verify Entered OTP Code (Real-world verification with test fallback)
+  // Step 2: Verify Entered OTP Code (Firebase Cloud Functions / SMS Gateway + test fallback)
   const handleVerifyOtp = async (e) => {
     e.preventDefault();
     soundEffects.playClick();
@@ -201,26 +202,36 @@ export const AuthModal = ({ setActiveTab, onOpenLegal }) => {
       let verified = false;
       let confirmedFbUser = null;
 
-      if (confirmationResult && typeof confirmationResult.confirm === 'function') {
-        try {
-          const userCred = await confirmationResult.confirm(cleanOtp);
-          if (userCred?.user) {
-            verified = true;
-            confirmedFbUser = userCred.user;
-          }
-        } catch (confirmErr) {
-          console.warn("Firebase OTP confirmation notice (evaluating test rescue fallback):", confirmErr?.code, confirmErr?.message);
-          if (cleanOtp === (fallbackOtp || "123456") || cleanOtp === "123456") {
-            verified = true;
-          } else {
-            throw new Error("Invalid verification code. Please check your SMS or enter test OTP 123456.");
-          }
+      // 1. Try Custom Cloud Function OTP Service (Fast2SMS / MSG91 / Twilio)
+      try {
+        const customRes = await customOtpService.verifyOtp(verifiedPhone, cleanOtp);
+        if (customRes && customRes.verified) {
+          verified = true;
+          confirmedFbUser = customRes.user || null;
         }
-      } else {
-        if (cleanOtp === (fallbackOtp || "123456") || cleanOtp === "123456") {
+      } catch (customErr) {
+        console.warn("Custom OTP verification notice (checking confirmationResult / test code):", customErr?.message);
+        
+        // 2. Fallback to client-side confirmationResult if available
+        if (confirmationResult && typeof confirmationResult.confirm === 'function') {
+          try {
+            const userCred = await confirmationResult.confirm(cleanOtp);
+            if (userCred?.user) {
+              verified = true;
+              confirmedFbUser = userCred.user;
+            }
+          } catch (confirmErr) {
+            console.warn("Firebase OTP confirmation notice:", confirmErr?.code, confirmErr?.message);
+            if (cleanOtp === (fallbackOtp || "123456") || cleanOtp === "123456") {
+              verified = true;
+            } else {
+              throw new Error("Invalid verification code. Please check your SMS or enter test OTP 123456.");
+            }
+          }
+        } else if (cleanOtp === (fallbackOtp || "123456") || cleanOtp === "123456") {
           verified = true;
         } else {
-          throw new Error("Invalid verification code. (For testing, enter 123456)");
+          throw new Error(customErr.message || "Invalid verification code. Please check your SMS.");
         }
       }
 

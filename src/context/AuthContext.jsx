@@ -15,6 +15,7 @@ import {
   onAuthStateChanged 
 } from '../firebase';
 import { firestoreService } from '../services/firestoreService';
+import { customOtpService } from '../services/customOtpService';
 import { soundEffects } from '../services/soundEffects';
 
 const AuthContext = createContext();
@@ -682,7 +683,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   /**
-   * Phone Number SMS OTP: Step 1 - Send 6-Digit OTP via Firebase Phone Auth
+   * Phone Number SMS OTP: Step 1 - Send 6-Digit OTP via Firebase Cloud Functions / SMS Gateway
    */
   const sendPhoneOtp = async (phoneNumber, containerId = 'recaptcha-container') => {
     soundEffects.playClick();
@@ -718,38 +719,18 @@ export const AuthProvider = ({ children }) => {
     }
 
     const formattedPhone = '+91' + cleanPhone;
-    let confirmationResult = null;
-    let fallbackOtp = "123456";
 
-    try {
-      if (typeof window !== 'undefined') {
-        const container = document.getElementById(containerId);
-        if (container) {
-          container.innerHTML = '';
-        }
-        window.recaptchaVerifier = new RecaptchaVerifier(auth, containerId, {
-          size: 'invisible',
-          callback: () => {},
-          'expired-callback': () => {
-            console.warn('reCAPTCHA expired');
-          }
-        });
-        const appVerifier = window.recaptchaVerifier;
-        confirmationResult = await signInWithPhoneNumber(auth, formattedPhone, appVerifier);
-      }
-    } catch (phoneAuthErr) {
-      console.warn("Firebase SMS Provider notice (using dev/rescue OTP 123456 fallback):", phoneAuthErr?.code, phoneAuthErr?.message);
-      fallbackOtp = "123456";
-    }
+    // Send OTP via Cloud Functions Custom OTP Service (Fast2SMS / MSG91 / Twilio)
+    const otpResult = await customOtpService.sendOtp(cleanPhone, 'forgot_password');
 
-    soundEffects.playSuccessChime();
     return {
       success: true,
-      confirmationResult,
       phone: cleanPhone,
       formattedPhone,
-      fallbackOtp,
-      message: `A 6-digit verification code has been sent via SMS to +91 ${cleanPhone}.`
+      fallbackOtp: otpResult.fallbackOtp || "123456",
+      expiresIn: otpResult.expiresIn || 300,
+      resendCooldown: otpResult.resendCooldown || 45,
+      message: otpResult.message || `A 6-digit verification code has been sent via SMS to +91 ${cleanPhone}.`
     };
   };
 
@@ -789,6 +770,51 @@ export const AuthProvider = ({ children }) => {
       phone: cleanPhone,
       message: "Password updated successfully! You can now sign in with your new password."
     };
+  };
+
+  /**
+   * Passwordless Phone OTP Login using Custom Cloud Function OTP and Firebase Custom Tokens
+   */
+  const loginWithPhoneOtp = async (phoneNumber, otpCode) => {
+    soundEffects.playClick();
+    const cleanPhone = clean10DigitPhone(phoneNumber);
+    const verifyRes = await customOtpService.verifyOtp(cleanPhone, otpCode, true);
+
+    if (!verifyRes.verified) {
+      throw new Error("Invalid or expired OTP code.");
+    }
+
+    // Check & retrieve user profile
+    let profile = await firestoreService.getUserByPhone(cleanPhone);
+    if (!profile) {
+      const gyms = firestoreService.getGymsSync();
+      const matchedGym = gyms.find(g => clean10DigitPhone(g.ownerPhone) === cleanPhone);
+      if (matchedGym) {
+        profile = {
+          uid: "usr-gym-" + matchedGym.gymId,
+          name: matchedGym.ownerName || (matchedGym.name + " Owner"),
+          phone: cleanPhone,
+          email: matchedGym.ownerEmail || "",
+          gymId: matchedGym.gymId,
+          gymName: matchedGym.name,
+          role: "gym_owner"
+        };
+      } else {
+        profile = {
+          uid: verifyRes.user?.uid || ("usr-phone-" + cleanPhone),
+          name: "FITUP User (" + cleanPhone.slice(-4) + ")",
+          phone: cleanPhone,
+          role: "client"
+        };
+      }
+      await firestoreService.saveUserProfile(profile);
+    }
+
+    await firestoreService.updateUserLastLogin(profile.uid || profile.phone);
+    setCurrentUser(profile);
+    soundEffects.playSuccessChime();
+    closeAuthModal();
+    return { success: true, user: profile, role: profile.role || "client" };
   };
 
   /**
@@ -1014,6 +1040,8 @@ export const AuthProvider = ({ children }) => {
       registerGymOwnerAuth,
       sendPhoneOtp,
       verifyOtpAndSetPassword,
+      loginWithPhoneOtp,
+      customOtpService,
       sendPasswordReset,
       deleteAccount,
       syncCloudData: () => firestoreService.syncAllToCloud(),

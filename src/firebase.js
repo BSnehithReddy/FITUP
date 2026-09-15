@@ -6,6 +6,7 @@ import {
     sendPasswordResetEmail, 
     sendEmailVerification,
     signInWithPhoneNumber,
+    signInWithCustomToken,
     signInWithPopup,
     GoogleAuthProvider,
     RecaptchaVerifier,
@@ -14,6 +15,7 @@ import {
     updateProfile, 
     onAuthStateChanged 
 } from "firebase/auth";
+import { getFunctions, httpsCallable } from "firebase/functions";
 import { getAnalytics, isSupported as isAnalyticsSupported } from "firebase/analytics";
 import { 
     getFirestore, 
@@ -58,6 +60,9 @@ googleProvider.setCustomParameters({
   prompt: 'select_account'
 });
 
+// Initialize Cloud Functions
+const functions = getFunctions(app);
+
 // Initialize Firebase Analytics safely (supporting web, SSR, and webviews)
 let analytics = null;
 if (typeof window !== 'undefined') {
@@ -75,6 +80,9 @@ export {
     app,
     db, 
     auth,
+    functions,
+    getFunctions,
+    httpsCallable,
     googleProvider,
     signInWithPopup,
     GoogleAuthProvider,
@@ -83,6 +91,7 @@ export {
     sendPasswordResetEmail,
     sendEmailVerification,
     signInWithPhoneNumber,
+    signInWithCustomToken,
     RecaptchaVerifier,
     updatePassword,
     signOut,
