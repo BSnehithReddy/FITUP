@@ -1,3 +1,4 @@
+require('dotenv').config();
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 const crypto = require('crypto');
@@ -157,18 +158,7 @@ async function handleVerifyOtpCore(phone, otpCode) {
   const snap = await docRef.get();
 
   if (!snap.exists) {
-    // Check developer/test rescue code (123456)
-    if (cleanOtp === '123456') {
-      const customToken = await generateUserAuthToken(cleanPhone);
-      return {
-        success: true,
-        verified: true,
-        phone: cleanPhone,
-        customToken,
-        message: 'OTP verified successfully (Dev Test Mode)!'
-      };
-    }
-    throw new functions.https.HttpsError('not-found', 'No OTP request found for this number. Please request a new code.');
+    throw new functions.https.HttpsError('not-found', 'No active OTP request found for this number. Please request a new verification code.');
   }
 
   const record = snap.data();
@@ -186,16 +176,15 @@ async function handleVerifyOtpCore(phone, otpCode) {
     throw new functions.https.HttpsError('permission-denied', 'Maximum verification attempts exceeded. Please request a new OTP.');
   }
 
-  // Hash input code & compare
+  // Hash input code & strictly compare
   const expectedHash = record.hashedOtp;
   const inputHash = hashOtp(cleanPhone, cleanOtp);
-  const isDevBypass = cleanOtp === '123456';
 
-  if (inputHash !== expectedHash && !isDevBypass) {
+  if (inputHash !== expectedHash) {
     const remaining = record.attemptsLeft - 1;
     if (remaining <= 0) {
       await docRef.delete();
-      throw new functions.https.HttpsError('permission-denied', 'Invalid code. Maximum attempts exceeded. Please request a new OTP.');
+      throw new functions.https.HttpsError('permission-denied', 'Invalid verification code. Maximum attempts exceeded. Please request a new OTP.');
     } else {
       await docRef.update({ attemptsLeft: remaining });
       throw new functions.https.HttpsError('invalid-argument', `Invalid verification code. ${remaining} attempt(s) remaining.`);

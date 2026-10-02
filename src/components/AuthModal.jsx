@@ -170,12 +170,11 @@ export const AuthModal = ({ setActiveTab, onOpenLegal }) => {
     try {
       const res = await sendPhoneOtp(cleanPhone, 'recaptcha-container');
       setConfirmationResult(res.confirmationResult);
-      setFallbackOtp(res.fallbackOtp || '123456');
       setVerifiedPhone(cleanPhone);
       setVerifiedFirebaseUser(null);
       setIsOtpVerified(false);
       setOtpStep('enter_otp');
-      setCountdown(30);
+      setCountdown(45);
       setSuccessMessage(res.message || `OTP sent to +91 ${cleanPhone}`);
     } catch (err) {
       setErrorMessage(err.message || 'Failed to send verification code. Please check your number.');
@@ -184,7 +183,7 @@ export const AuthModal = ({ setActiveTab, onOpenLegal }) => {
     }
   };
 
-  // Step 2: Verify Entered OTP Code (Firebase Cloud Functions / SMS Gateway + test fallback)
+  // Step 2: Verify Entered OTP Code (Live Fast2SMS / Cloud Functions Verification)
   const handleVerifyOtp = async (e) => {
     e.preventDefault();
     soundEffects.playClick();
@@ -202,7 +201,7 @@ export const AuthModal = ({ setActiveTab, onOpenLegal }) => {
       let verified = false;
       let confirmedFbUser = null;
 
-      // 1. Try Custom Cloud Function OTP Service (Fast2SMS / MSG91 / Twilio)
+      // 1. Verify with Custom Cloud Function OTP Service (Fast2SMS)
       try {
         const customRes = await customOtpService.verifyOtp(verifiedPhone, cleanOtp);
         if (customRes && customRes.verified) {
@@ -210,9 +209,7 @@ export const AuthModal = ({ setActiveTab, onOpenLegal }) => {
           confirmedFbUser = customRes.user || null;
         }
       } catch (customErr) {
-        console.warn("Custom OTP verification notice (checking confirmationResult / test code):", customErr?.message);
-        
-        // 2. Fallback to client-side confirmationResult if available
+        // 2. Check client-side confirmationResult if available
         if (confirmationResult && typeof confirmationResult.confirm === 'function') {
           try {
             const userCred = await confirmationResult.confirm(cleanOtp);
@@ -221,15 +218,8 @@ export const AuthModal = ({ setActiveTab, onOpenLegal }) => {
               confirmedFbUser = userCred.user;
             }
           } catch (confirmErr) {
-            console.warn("Firebase OTP confirmation notice:", confirmErr?.code, confirmErr?.message);
-            if (cleanOtp === (fallbackOtp || "123456") || cleanOtp === "123456") {
-              verified = true;
-            } else {
-              throw new Error("Invalid verification code. Please check your SMS or enter test OTP 123456.");
-            }
+            throw new Error("Invalid or expired verification code. Please check your SMS.");
           }
-        } else if (cleanOtp === (fallbackOtp || "123456") || cleanOtp === "123456") {
-          verified = true;
         } else {
           throw new Error(customErr.message || "Invalid verification code. Please check your SMS.");
         }
@@ -885,8 +875,8 @@ export const AuthModal = ({ setActiveTab, onOpenLegal }) => {
                             className="w-full bg-slate-950 border border-emerald-400/40 rounded-xl pl-10 pr-4 py-2.5 text-center text-lg tracking-[0.35em] text-emerald-400 placeholder-slate-600 focus:outline-none focus:border-emerald-400 font-mono font-bold"
                           />
                         </div>
-                        <span className="text-[10px] text-slate-500 block mt-1">
-                          Real SMS code sent to +91 {verifiedPhone}. (Test code: <strong className="text-emerald-400">123456</strong>)
+                        <span className="text-[11px] text-slate-400 block mt-1">
+                          SMS verification code sent to +91 {verifiedPhone}
                         </span>
                       </div>
 

@@ -727,7 +727,6 @@ export const AuthProvider = ({ children }) => {
       success: true,
       phone: cleanPhone,
       formattedPhone,
-      fallbackOtp: otpResult.fallbackOtp || "123456",
       expiresIn: otpResult.expiresIn || 300,
       resendCooldown: otpResult.resendCooldown || 45,
       message: otpResult.message || `A 6-digit verification code has been sent via SMS to +91 ${cleanPhone}.`

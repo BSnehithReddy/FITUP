@@ -56,7 +56,6 @@ class CustomOtpService {
           provider: data.provider || 'cloud_function',
           expiresIn: data.expiresIn || 300,
           resendCooldown: data.resendCooldown || 45,
-          fallbackOtp: '123456',
           message: data.message || `A 6-digit verification code has been sent via SMS to +91 ${cleanPhone}.`
         };
       } else {
@@ -76,23 +75,14 @@ class CustomOtpService {
           phone: cleanPhone,
           provider: data.provider || 'rest_api',
           expiresIn: data.expiresIn || 300,
-          fallbackOtp: '123456',
+          resendCooldown: 45,
           message: data.message || `A 6-digit verification code has been sent via SMS to +91 ${cleanPhone}.`
         };
       }
     } catch (err) {
-      console.warn('[CustomOtpService] Cloud Function send OTP notice (enabling dev/rescue OTP 123456):', err.message);
-      // Ensure developers and offline testers are never blocked if SMS provider is not active
-      soundEffects.playSuccessChime();
-      return {
-        success: true,
-        phone: cleanPhone,
-        provider: 'dev_rescue_mode',
-        expiresIn: 300,
-        resendCooldown: 30,
-        fallbackOtp: '123456',
-        message: `A 6-digit verification code has been sent via SMS to +91 ${cleanPhone}.`
-      };
+      console.error('[CustomOtpService] Error sending SMS OTP:', err.message);
+      soundEffects.playError();
+      throw new Error(err.message || 'Failed to dispatch SMS verification code. Please try again.');
     }
   }
 
@@ -157,21 +147,7 @@ class CustomOtpService {
         message: verifiedData?.message || 'Mobile number verified successfully!'
       };
     } catch (err) {
-      console.warn('[CustomOtpService] Cloud Function verify OTP notice (checking dev test code):', err.message);
-
-      // Fallback: Check dev/rescue code 123456
-      if (cleanOtp === '123456') {
-        soundEffects.playSuccessChime();
-        return {
-          success: true,
-          verified: true,
-          phone: cleanPhone,
-          customToken: null,
-          user: null,
-          message: 'Mobile number verified successfully (Test Mode)!'
-        };
-      }
-
+      console.error('[CustomOtpService] OTP verification failed:', err.message);
       soundEffects.playError();
       throw new Error(err.message || 'Invalid or expired verification code. Please check your SMS.');
     }

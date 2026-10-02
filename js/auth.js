@@ -1,23 +1,31 @@
 /* ==========================================================================
-   FITUP - Authentication Module (Clean & Secure Owner / Client Login)
+   FITUP - Authentication Module (Live Fast2SMS OTP Integration)
    ========================================================================== */
+
+const API_SEND_OTP = "https://us-central1-fitup-ccb95.cloudfunctions.net/apiSendCustomOtp";
+const API_VERIFY_OTP = "https://us-central1-fitup-ccb95.cloudfunctions.net/apiVerifyCustomOtp";
 
 const auth = {
     currentAuthMode: "login",
+    otpSent: false,
 
     openAuthModal(mode = "login") {
+        this.otpSent = false;
         this.switchAuthMode(mode);
         document.getElementById('authModal').classList.add('active');
     },
 
     closeAuthModal() {
+        this.otpSent = false;
         document.getElementById('authModal').classList.remove('active');
         document.getElementById('authErrorMessage').style.display = 'none';
         document.getElementById('authForm').reset();
+        this.resetOtpUi();
     },
 
     switchAuthMode(mode) {
         this.currentAuthMode = mode;
+        this.otpSent = false;
         const nameGroup = document.getElementById('nameGroup');
         const loginTabBtn = document.getElementById('loginTabBtn');
         const registerTabBtn = document.getElementById('registerTabBtn');
@@ -27,38 +35,52 @@ const auth = {
             nameGroup.style.display = 'block';
             loginTabBtn.classList.remove('active');
             registerTabBtn.classList.add('active');
-            submitBtn.textContent = 'Create FITUP Account';
+            submitBtn.textContent = 'Send Registration OTP';
         } else {
             nameGroup.style.display = 'none';
             loginTabBtn.classList.add('active');
             registerTabBtn.classList.remove('active');
-            submitBtn.textContent = 'Sign In to FITUP';
+            submitBtn.textContent = 'Send Sign-In OTP';
         }
 
+        this.resetOtpUi();
         document.getElementById('authErrorMessage').style.display = 'none';
     },
 
-    handleAuthSubmit(e) {
+    resetOtpUi() {
+        const passwordInput = document.getElementById('authPassword');
+        const passwordLabel = passwordInput?.previousElementSibling;
+        const submitBtn = document.getElementById('authSubmitBtn');
+
+        if (passwordInput) {
+            passwordInput.placeholder = "Enter 6-digit OTP or Owner Password";
+            passwordInput.value = "";
+        }
+        if (passwordLabel) passwordLabel.textContent = "OTP Code / Password";
+        if (submitBtn && !this.otpSent) {
+            submitBtn.textContent = this.currentAuthMode === 'register' ? 'Send Registration OTP' : 'Send Sign-In OTP';
+        }
+    },
+
+    async handleAuthSubmit(e) {
         e.preventDefault();
         const phone = document.getElementById('authPhone').value.trim();
-        const password = document.getElementById('authPassword').value.trim();
+        const otpOrPassword = document.getElementById('authPassword').value.trim();
         const name = document.getElementById('authName').value.trim();
         const errorEl = document.getElementById('authErrorMessage');
+        const submitBtn = document.getElementById('authSubmitBtn');
 
-        if (!phone || !password) {
-            errorEl.textContent = 'Please enter phone number and password.';
+        errorEl.style.display = 'none';
+
+        if (!phone) {
+            errorEl.textContent = 'Please enter a valid phone number.';
             errorEl.style.display = 'block';
             return;
         }
 
-        // CHECK FOR OWNER CREDENTIALS (SNEHITH)
-        if (phone === "9030118909" && (password === "Snehith@020777" || name.toUpperCase() === "SNEHITH")) {
-            const ownerUser = {
-                name: "SNEHITH",
-                phone: "9030118909",
-                role: "owner"
-            };
-            store.setCurrentUser(ownerUser);
+        // 1. OWNER BYPASS (Immediate login without requiring SMS credits)
+        if (phone === "9030118909" && (otpOrPassword === "Snehith@020777" || name.toUpperCase() === "SNEHITH")) {
+            store.setCurrentUser({ name: "SNEHITH", phone: "9030118909", role: "owner" });
             this.updateNavState();
             this.closeAuthModal();
             app.showToast("Logged in as Gym Owner (SNEHITH) ✅");
@@ -66,26 +88,93 @@ const auth = {
             return;
         }
 
-        // CLIENT LOGIN / REGISTER
-        if (this.currentAuthMode === 'register') {
-            if (!name) {
-                errorEl.textContent = 'Please enter your full name.';
+        if (this.currentAuthMode === 'register' && !name) {
+            errorEl.textContent = 'Please enter your full name.';
+            errorEl.style.display = 'block';
+            return;
+        }
+
+        // 2. STEP 1: REQUEST SMS OTP
+        if (!this.otpSent) {
+            submitBtn.disabled = true;
+            submitBtn.textContent = "Sending OTP...";
+
+            try {
+                const response = await fetch(API_SEND_OTP, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ phone })
+                });
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || "Failed to send SMS OTP");
+                }
+
+                this.otpSent = true;
+                submitBtn.disabled = false;
+                submitBtn.textContent = "Verify OTP & Continue";
+
+                const passwordInput = document.getElementById('authPassword');
+                if (passwordInput) {
+                    passwordInput.value = "";
+                    passwordInput.placeholder = "Enter 6-digit OTP";
+                    passwordInput.focus();
+                }
+
+                app.showToast("6-digit OTP sent to your phone! 📲");
+            } catch (err) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = this.currentAuthMode === 'register' ? 'Send Registration OTP' : 'Send Sign-In OTP';
+                errorEl.textContent = err.message;
                 errorEl.style.display = 'block';
-                return;
             }
-            const newUser = { name, phone, role: 'client' };
-            store.setCurrentUser(newUser);
+            return;
+        }
+
+        // 3. STEP 2: VERIFY ENTERED OTP CODE
+        if (!otpOrPassword) {
+            errorEl.textContent = 'Please enter the 6-digit OTP sent to your mobile.';
+            errorEl.style.display = 'block';
+            return;
+        }
+
+        submitBtn.disabled = true;
+        submitBtn.textContent = "Verifying...";
+
+        try {
+            const response = await fetch(API_VERIFY_OTP, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ phone, otp: otpOrPassword })
+            });
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || "Invalid or expired OTP");
+            }
+
+            const authenticatedUser = {
+                name: name || (this.currentAuthMode === 'register' ? "New Member" : "Client User"),
+                phone: phone,
+                role: 'client',
+                token: data.token || null
+            };
+
+            store.setCurrentUser(authenticatedUser);
             this.updateNavState();
             this.closeAuthModal();
-            app.showToast("Account created successfully! Welcome to FITUP 🎉");
+
+            const toastMessage = this.currentAuthMode === 'register'
+                ? "Account verified and created! Welcome to FITUP 🎉"
+                : "OTP verified! Logged in successfully 🚀";
+            app.showToast(toastMessage);
             app.showSection('search');
-        } else {
-            const user = { name: name || "Client User", phone, role: 'client' };
-            store.setCurrentUser(user);
-            this.updateNavState();
-            this.closeAuthModal();
-            app.showToast("Logged in successfully! 🚀");
-            app.showSection('search');
+        } catch (err) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = "Verify OTP & Continue";
+            errorEl.textContent = err.message;
+            errorEl.style.display = 'block';
         }
     },
 
@@ -106,7 +195,7 @@ const auth = {
         if (user) {
             loggedOutView.style.display = 'none';
             loggedInView.style.display = 'flex';
-            
+
             document.getElementById('navUserName').textContent = user.name;
             document.getElementById('navUserAvatar').textContent = user.name.charAt(0).toUpperCase();
 
