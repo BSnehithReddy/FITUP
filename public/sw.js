@@ -1,28 +1,32 @@
-const CACHE_NAME = 'fitup-pwa-v2';
-const ASSETS_TO_CACHE = [
-  './',
-  './index.html',
-  './manifest.json'
+const CACHE_NAME = 'fitup-pwa-v3';
+const PRECACHE_URLS = [
+  '/',
+  '/index.html',
+  '/manifest.json',
+  '/icon-192x192.png',
+  '/icon-512x512.png'
 ];
 
-// Install Event - immediate takeover
+// 1. Install Event: Pre-cache essential offline shell
 self.addEventListener('install', (event) => {
   self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS_TO_CACHE);
+      return cache.addAll(PRECACHE_URLS).catch((err) => {
+        console.warn('[SW] Pre-caching warning:', err);
+      });
     })
   );
 });
 
-// Activate Event - purge old caches immediately
+// 2. Activate Event: Clean up stale caches & claim clients
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
-        cacheNames.map((cache) => {
-          if (cache !== CACHE_NAME) {
-            return caches.delete(cache);
+        cacheNames.map((name) => {
+          if (name !== CACHE_NAME) {
+            return caches.delete(name);
           }
         })
       );
@@ -30,22 +34,43 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Fetch Event - Network First, fallback to cache
+// 3. Fetch Event: Network-first with offline cache fallback
 self.addEventListener('fetch', (event) => {
+  // Only intercept GET requests & skip external APIs / chrome-extension
+  if (event.request.method !== 'GET') return;
+  const url = new URL(event.request.url);
+
+  // Skip Firebase APIs, Razorpay endpoints, and Cloud Functions
+  if (
+    url.hostname.includes('firebaseio.com') ||
+    url.hostname.includes('googleapis.com') ||
+    url.hostname.includes('cloudfunctions.net') ||
+    url.hostname.includes('razorpay.com') ||
+    url.hostname.includes('fast2sms.com')
+  ) {
+    return;
+  }
+
   event.respondWith(
     fetch(event.request)
       .then((networkResponse) => {
-        if (networkResponse && networkResponse.status === 200) {
-          const responseClone = networkResponse.clone();
+        if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+          const responseToCache = networkResponse.clone();
           caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseClone);
+            cache.put(event.request, responseToCache);
           });
         }
         return networkResponse;
       })
       .catch(() => {
         return caches.match(event.request).then((cachedResponse) => {
-          return cachedResponse || caches.match('./index.html');
+          if (cachedResponse) {
+            return cachedResponse;
+          }
+          if (event.request.mode === 'navigate') {
+            return caches.match('/index.html');
+          }
+          return new Response('Offline', { status: 503, statusText: 'Service Unavailable' });
         });
       })
   );

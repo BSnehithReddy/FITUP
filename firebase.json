@@ -1,7 +1,6 @@
 {
   "functions": {
     "source": "functions"
-<<<<<<< HEAD
   },
   "firestore": {
     "rules": "firestore.rules",
@@ -32,7 +31,5 @@
       "enabled": true,
       "port": 4000
     }
-=======
->>>>>>> 4e32468 (feat(auth): remove development test mode and enforce strict live Fast2SMS OTP verification)
   }
 }

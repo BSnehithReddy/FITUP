@@ -1,18 +1,38 @@
 {
+  "name": "FITUP - Gym Booking Platform",
   "short_name": "FITUP",
-  "name": "FITUP - Book. Lift. Repeat.",
-  "description": "Single-Session Gym PT Slot Booking Application (₹200/Slot)",
+  "description": "Book gym passes and manage fitness memberships seamlessly.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0B0F19",
+  "theme_color": "#0B0F19",
+  "categories": ["fitness", "lifestyle", "sports", "health"],
   "icons": [
     {
-      "src": "assets/fitup-logo.png",
-      "sizes": "192x192 512x512",
+      "src": "/icon-192x192.png",
+      "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
     }
-  ],
-  "start_url": "./index.html",
-  "background_color": "#070b19",
-  "theme_color": "#070b19",
-  "display": "standalone",
-  "orientation": "portrait"
+  ]
 }

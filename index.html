@@ -3,40 +3,47 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <base href="./">
-    <title>FITUP - Book. Lift. Repeat. | Single-Session Gym PT Slots (₹280/Slot)</title>
-    <meta name="description" content="Book 2-hour Personal Training trial slots at top local gyms for just ₹200-₹280 per session. FITUP - Book. Lift. Repeat.">
-    <!-- PWA Manifest & Meta Tags -->
-    <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#070b19">
+    <title>FITUP - Gym Booking Platform | Book. Lift. Repeat.</title>
+    <meta name="description" content="Book gym passes and manage fitness memberships seamlessly. Single-Session Personal Training Slots at top local gyms.">
+    
+    <!-- PWA Manifest & Meta Tags for PWABuilder & Mobile Browsers -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#0B0F19">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="FITUP">
     <meta name="mobile-web-app-capable" content="yes">
-    <!-- Favicon -->
-    <link rel="icon" type="image/png" href="assets/fitup-logo.png">
-    <link rel="apple-touch-icon" href="assets/fitup-logo.png">
+    <meta name="application-name" content="FITUP">
+    
+    <!-- Favicons & Touch Icons -->
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192x192.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="/icon-512x512.png">
+    <link rel="apple-touch-icon" href="/icon-192x192.png">
+    
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
     <!-- Razorpay Standard Checkout SDK -->
     <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 </head>
-<body class="bg-[#070b19] text-gray-100 font-inter antialiased min-h-screen selection:bg-[#00f0ff]/30 selection:text-[#00f0ff]">
+<body class="bg-[#0B0F19] text-gray-100 font-inter antialiased min-h-screen selection:bg-[#00f0ff]/30 selection:text-[#00f0ff]">
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
     
-    <!-- PWA Service Worker Registration with Auto-Update -->
+    <!-- PWA Service Worker Registration -->
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('sw.js')
+          navigator.serviceWorker.register('/sw.js', { scope: '/' })
             .then((reg) => {
               reg.update();
-              console.log('FITUP PWA Service Worker v2 Active!', reg);
+              console.log('FITUP PWA Service Worker Registered & Active!', reg.scope);
             })
-            .catch((err) => console.warn('PWA Service Worker Registration Failed:', err));
+            .catch((err) => {
+              console.warn('PWA Service Worker Registration Warning:', err);
+            });
         });
       }
     </script>
