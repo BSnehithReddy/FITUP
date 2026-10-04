@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { firestoreService } from '../services/firestoreService';
 import { soundEffects } from '../services/soundEffects';
 import { SafeImage } from './SafeImage';
-import { useAuth } from '../context/AuthContext';
+import { useAuth, isValidEmail } from '../context/AuthContext';
 import { DeleteAccountModal } from './DeleteAccountModal';
 import { 
   Building2, Users, Wallet, Plus, Trash2, Edit, CheckCircle2, 
@@ -95,6 +95,23 @@ export const OwnerDashboard = ({ setActiveTab }) => {
   const [editingTrainer, setEditingTrainer] = useState(null);
 
   // Form State
+  const [ownerEmailError, setOwnerEmailError] = useState('');
+  const [ownerEmailTouched, setOwnerEmailTouched] = useState(false);
+
+  const validateOwnerEmail = (val) => {
+    const trimmed = (val || '').trim();
+    if (!trimmed) {
+      setOwnerEmailError('');
+      return true;
+    }
+    if (!isValidEmail(trimmed)) {
+      setOwnerEmailError('Please enter a valid email address, like name@example.com');
+      return false;
+    }
+    setOwnerEmailError('');
+    return true;
+  };
+
   const [gymForm, setGymForm] = useState({
     name: '', 
     location: '', 
@@ -275,6 +292,8 @@ export const OwnerDashboard = ({ setActiveTab }) => {
       });
     }
     setShowGymModal(true);
+    setOwnerEmailError('');
+    setOwnerEmailTouched(false);
   };
 
   const handleSaveGym = async (e) => {
@@ -282,6 +301,12 @@ export const OwnerDashboard = ({ setActiveTab }) => {
     soundEffects.playClick();
     if (!gymForm.name || !gymForm.location) {
       alert("Please fill in Gym Name and Location");
+      return;
+    }
+
+    if (gymForm.ownerEmail && !validateOwnerEmail(gymForm.ownerEmail)) {
+      setOwnerEmailTouched(true);
+      showToast("Please enter a valid owner email address format.");
       return;
     }
 
@@ -1097,10 +1122,28 @@ export const OwnerDashboard = ({ setActiveTab }) => {
                   <input
                     type="email"
                     value={gymForm.ownerEmail}
-                    onChange={(e) => setGymForm({ ...gymForm, ownerEmail: e.target.value })}
+                    onChange={(e) => {
+                      setGymForm({ ...gymForm, ownerEmail: e.target.value });
+                      if (ownerEmailTouched) validateOwnerEmail(e.target.value);
+                    }}
+                    onBlur={(e) => {
+                      setOwnerEmailTouched(true);
+                      validateOwnerEmail(e.target.value);
+                    }}
                     placeholder="e.g. vinay@gsfitness.com"
-                    className="w-full bg-slate-900 border border-white/10 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-emerald-400"
+                    className={`w-full bg-slate-900 border ${
+                      ownerEmailTouched && ownerEmailError
+                        ? 'border-rose-500 bg-rose-950/20 text-rose-100'
+                        : ownerEmailTouched && !ownerEmailError && gymForm.ownerEmail.trim()
+                        ? 'border-emerald-500'
+                        : 'border-white/10 focus:border-emerald-400'
+                    } rounded-lg px-3 py-2 text-white text-xs focus:outline-none transition-all`}
                   />
+                  {ownerEmailTouched && ownerEmailError && (
+                    <span className="text-[10px] text-rose-400 block mt-1">
+                      {ownerEmailError}
+                    </span>
+                  )}
                 </div>
                 <div>
                   <label className="text-slate-400 block mb-1 text-xs">Custom Owner Password</label>

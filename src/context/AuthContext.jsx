@@ -22,10 +22,10 @@ const AuthContext = createContext();
 
 const REGISTERED_CLIENTS_KEY = "fitup_registered_clients";
 
-// Strict RFC 5322 compliant email validator
+// Strict RFC-compliant email validator
 export const isValidEmail = (email) => {
   if (!email || typeof email !== 'string') return false;
-  const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailRegex.test(email.trim().toLowerCase());
 };
 

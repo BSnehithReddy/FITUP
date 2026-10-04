@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../context/AuthContext';
+import { useAuth, isValidEmail } from '../context/AuthContext';
 import { soundEffects } from '../services/soundEffects';
 import { firestoreService } from '../services/firestoreService';
 import { razorpayService } from '../services/razorpayService';
@@ -45,6 +45,16 @@ export const AuthModal = ({ setActiveTab, onOpenLegal }) => {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+
+  // Email validation inline states
+  const [emailError, setEmailError] = useState('');
+  const [emailTouched, setEmailTouched] = useState(false);
+  const [ownerEmailError, setOwnerEmailError] = useState('');
+  const [ownerEmailTouched, setOwnerEmailTouched] = useState(false);
+  const [resetEmailError, setResetEmailError] = useState('');
+  const [resetEmailTouched, setResetEmailTouched] = useState(false);
+  const [identifierError, setIdentifierError] = useState('');
+  const [identifierTouched, setIdentifierTouched] = useState(false);
 
   // Gym Owner specific registration fields (₹2,200 Onboarding Fee + Coupon)
   const [ownerName, setOwnerName] = useState('');
@@ -98,6 +108,73 @@ export const AuthModal = ({ setActiveTab, onOpenLegal }) => {
     setErrorMessage('');
     setSuccessMessage('');
     setCouponError('');
+    setEmailError('');
+    setOwnerEmailError('');
+    setResetEmailError('');
+    setIdentifierError('');
+    setEmailTouched(false);
+    setOwnerEmailTouched(false);
+    setResetEmailTouched(false);
+    setIdentifierTouched(false);
+  };
+
+  // Live RFC Email Format Validation Helpers
+  const validateClientEmail = (val) => {
+    const trimmed = (val || '').trim();
+    if (!trimmed) {
+      setEmailError('');
+      return true;
+    }
+    if (!isValidEmail(trimmed)) {
+      setEmailError('Please enter a valid email address, like name@example.com');
+      return false;
+    }
+    setEmailError('');
+    return true;
+  };
+
+  const validateOwnerEmail = (val) => {
+    const trimmed = (val || '').trim();
+    if (!trimmed) {
+      setOwnerEmailError('Please enter a valid email address, like name@example.com');
+      return false;
+    }
+    if (!isValidEmail(trimmed)) {
+      setOwnerEmailError('Please enter a valid email address, like name@example.com');
+      return false;
+    }
+    setOwnerEmailError('');
+    return true;
+  };
+
+  const validateResetEmail = (val) => {
+    const trimmed = (val || '').trim();
+    if (!trimmed) {
+      setResetEmailError('Please enter a valid email address, like name@example.com');
+      return false;
+    }
+    if (!isValidEmail(trimmed)) {
+      setResetEmailError('Please enter a valid email address, like name@example.com');
+      return false;
+    }
+    setResetEmailError('');
+    return true;
+  };
+
+  const validateIdentifier = (val) => {
+    const trimmed = (val || '').trim();
+    if (!trimmed) {
+      setIdentifierError('');
+      return true;
+    }
+    if (trimmed.includes('@')) {
+      if (!isValidEmail(trimmed)) {
+        setIdentifierError('Please enter a valid email address, like name@example.com');
+        return false;
+      }
+    }
+    setIdentifierError('');
+    return true;
   };
 
   const handleApplyCoupon = async (e) => {
@@ -244,12 +321,13 @@ export const AuthModal = ({ setActiveTab, onOpenLegal }) => {
   const handleSendEmailReset = async (e) => {
     if (e) e.preventDefault();
     soundEffects.playClick();
-    resetFormState();
+    setErrorMessage('');
+    setSuccessMessage('');
+    setResetEmailTouched(true);
 
-    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-    if (!resetEmail.trim() || !emailRegex.test(resetEmail.trim().toLowerCase())) {
+    if (!validateResetEmail(resetEmail)) {
       soundEffects.playError();
-      setErrorMessage('Please enter a valid registered email address (e.g. name@example.com).');
+      setErrorMessage('Please enter a valid email address, like name@example.com');
       return;
     }
 
@@ -367,11 +445,13 @@ export const AuthModal = ({ setActiveTab, onOpenLegal }) => {
           return;
         }
 
-        const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-        if (cleanClientEmail && !emailRegex.test(cleanClientEmail.toLowerCase())) {
-          soundEffects.playError();
-          setErrorMessage('Please enter a valid email address format (e.g. name@example.com).');
-          return;
+        if (cleanClientEmail) {
+          setEmailTouched(true);
+          if (!validateClientEmail(cleanClientEmail)) {
+            soundEffects.playError();
+            setErrorMessage('Please enter a valid email address, like name@example.com');
+            return;
+          }
         }
 
         if (cleanClientPhone && cleanClientPhone.length !== 10) {
@@ -413,6 +493,15 @@ export const AuthModal = ({ setActiveTab, onOpenLegal }) => {
         soundEffects.playError();
         setErrorMessage('Please enter your Email / Phone Number and Password.');
         return;
+      }
+
+      if (identifier.includes('@')) {
+        setIdentifierTouched(true);
+        if (!validateIdentifier(identifier)) {
+          soundEffects.playError();
+          setErrorMessage('Please enter a valid email address, like name@example.com');
+          return;
+        }
       }
 
       setLoading(true);
@@ -466,10 +555,11 @@ export const AuthModal = ({ setActiveTab, onOpenLegal }) => {
           setErrorMessage('Please enter a valid 10-digit mobile number for booking alerts & UPI payouts.');
           return;
         }
-        const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-        if (!cleanEmail || !emailRegex.test(cleanEmail.toLowerCase())) {
+        
+        setOwnerEmailTouched(true);
+        if (!validateOwnerEmail(cleanEmail)) {
           soundEffects.playError();
-          setErrorMessage('Please enter a valid business email address format (e.g. partner@gsfitness.com).');
+          setErrorMessage('Please enter a valid business email address format, like partner@example.com');
           return;
         }
         if (!ownerPassword || ownerPassword.length < 6) {
@@ -558,6 +648,15 @@ export const AuthModal = ({ setActiveTab, onOpenLegal }) => {
         soundEffects.playError();
         setErrorMessage('Please enter your Owner Mobile / Email and Password.');
         return;
+      }
+
+      if (identifier.includes('@')) {
+        setIdentifierTouched(true);
+        if (!validateIdentifier(identifier)) {
+          soundEffects.playError();
+          setErrorMessage('Please enter a valid email address, like name@example.com');
+          return;
+        }
       }
 
       setLoading(true);
@@ -1010,19 +1109,41 @@ export const AuthModal = ({ setActiveTab, onOpenLegal }) => {
                       Registered Email Address
                     </label>
                     <div className="relative">
-                      <Mail className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
+                      <Mail className={`absolute left-3.5 top-3 w-4 h-4 transition-colors ${
+                        resetEmailTouched && resetEmailError ? 'text-rose-400' : 'text-slate-400'
+                      }`} />
                       <input
                         type="email"
                         required
                         value={resetEmail}
-                        onChange={(e) => setResetEmail(e.target.value)}
+                        onChange={(e) => {
+                          setResetEmail(e.target.value);
+                          if (resetEmailTouched) validateResetEmail(e.target.value);
+                        }}
+                        onBlur={(e) => {
+                          setResetEmailTouched(true);
+                          validateResetEmail(e.target.value);
+                        }}
                         placeholder="e.g. user@example.com or partner@gsfitness.com"
-                        className="w-full bg-slate-950 border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-electricBlue transition-all"
+                        className={`w-full bg-slate-950 border ${
+                          resetEmailTouched && resetEmailError
+                            ? 'border-rose-500/80 bg-rose-950/20 focus:border-rose-500 focus:ring-1 focus:ring-rose-500/40 text-rose-100'
+                            : resetEmailTouched && !resetEmailError && resetEmail.trim()
+                            ? 'border-emerald-500/60 focus:border-emerald-400'
+                            : 'border-white/10 focus:border-electricBlue'
+                        } rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none transition-all`}
                       />
                     </div>
-                    <span className="text-[10px] text-slate-500 block mt-1">
-                      We will send an official Firebase password reset link directly to your inbox.
-                    </span>
+                    {resetEmailTouched && resetEmailError ? (
+                      <div className="flex items-center gap-1.5 mt-1.5 text-rose-400 text-xs font-medium animate-fadeIn">
+                        <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                        <span>{resetEmailError}</span>
+                      </div>
+                    ) : (
+                      <span className="text-[10px] text-slate-500 block mt-1">
+                        We will send an official Firebase password reset link directly to your inbox.
+                      </span>
+                    )}
                   </div>
 
                   <button
@@ -1124,16 +1245,37 @@ export const AuthModal = ({ setActiveTab, onOpenLegal }) => {
                             Email Address
                           </label>
                           <div className="relative">
-                            <Mail className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
+                            <Mail className={`absolute left-3.5 top-3 w-4 h-4 transition-colors ${
+                              emailTouched && emailError ? 'text-rose-400' : 'text-slate-400'
+                            }`} />
                             <input
                               type="email"
                               required
                               value={email}
-                              onChange={(e) => setEmail(e.target.value)}
+                              onChange={(e) => {
+                                setEmail(e.target.value);
+                                if (emailTouched) validateClientEmail(e.target.value);
+                              }}
+                              onBlur={(e) => {
+                                setEmailTouched(true);
+                                validateClientEmail(e.target.value);
+                              }}
                               placeholder="e.g. karthik@example.com"
-                              className="w-full bg-slate-950 border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-electricBlue focus:ring-1 focus:ring-electricBlue transition-all"
+                              className={`w-full bg-slate-950 border ${
+                                emailTouched && emailError
+                                  ? 'border-rose-500/80 bg-rose-950/20 focus:border-rose-500 focus:ring-1 focus:ring-rose-500/40 text-rose-100'
+                                  : emailTouched && !emailError && email.trim()
+                                  ? 'border-emerald-500/60 focus:border-emerald-400'
+                                  : 'border-white/10 focus:border-electricBlue focus:ring-1 focus:ring-electricBlue'
+                              } rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none transition-all`}
                             />
                           </div>
+                          {emailTouched && emailError && (
+                            <div className="flex items-center gap-1.5 mt-1.5 text-rose-400 text-xs font-medium animate-fadeIn">
+                              <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                              <span>{emailError}</span>
+                            </div>
+                          )}
                         </div>
 
                         <div>
@@ -1161,16 +1303,37 @@ export const AuthModal = ({ setActiveTab, onOpenLegal }) => {
                           Email Address or Mobile Number
                         </label>
                         <div className="relative">
-                          <User className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
+                          <User className={`absolute left-3.5 top-3 w-4 h-4 transition-colors ${
+                            identifierTouched && identifierError ? 'text-rose-400' : 'text-slate-400'
+                          }`} />
                           <input
                             type="text"
                             required
                             value={identifier}
-                            onChange={(e) => setIdentifier(e.target.value)}
+                            onChange={(e) => {
+                              setIdentifier(e.target.value);
+                              if (identifierTouched) validateIdentifier(e.target.value);
+                            }}
+                            onBlur={(e) => {
+                              setIdentifierTouched(true);
+                              validateIdentifier(e.target.value);
+                            }}
                             placeholder="e.g. user@example.com or 9030118909"
-                            className="w-full bg-slate-950 border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-electricBlue focus:ring-1 focus:ring-electricBlue transition-all"
+                            className={`w-full bg-slate-950 border ${
+                              identifierTouched && identifierError
+                                ? 'border-rose-500/80 bg-rose-950/20 focus:border-rose-500 focus:ring-1 focus:ring-rose-500/40 text-rose-100'
+                                : identifierTouched && !identifierError && identifier.includes('@') && isValidEmail(identifier.trim())
+                                ? 'border-emerald-500/60 focus:border-emerald-400'
+                                : 'border-white/10 focus:border-electricBlue focus:ring-1 focus:ring-electricBlue'
+                            } rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none transition-all`}
                           />
                         </div>
+                        {identifierTouched && identifierError && (
+                          <div className="flex items-center gap-1.5 mt-1.5 text-rose-400 text-xs font-medium animate-fadeIn">
+                            <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                            <span>{identifierError}</span>
+                          </div>
+                        )}
                       </div>
                     )}
 
@@ -1283,19 +1446,41 @@ export const AuthModal = ({ setActiveTab, onOpenLegal }) => {
                             <span className="text-[10px] text-slate-500 font-mono">Tax Invoices & Verification</span>
                           </div>
                           <div className="relative">
-                            <Mail className="absolute left-3.5 top-3 w-4 h-4 text-emerald-400" />
+                            <Mail className={`absolute left-3.5 top-3 w-4 h-4 transition-colors ${
+                              ownerEmailTouched && ownerEmailError ? 'text-rose-400' : 'text-emerald-400'
+                            }`} />
                             <input
                               type="email"
                               required
                               value={ownerEmail}
-                              onChange={(e) => setOwnerEmail(e.target.value)}
+                              onChange={(e) => {
+                                setOwnerEmail(e.target.value);
+                                if (ownerEmailTouched) validateOwnerEmail(e.target.value);
+                              }}
+                              onBlur={(e) => {
+                                setOwnerEmailTouched(true);
+                                validateOwnerEmail(e.target.value);
+                              }}
                               placeholder="partner@gsfitness.com or gym@business.com"
-                              className="w-full bg-slate-950 border border-white/10 rounded-xl pl-10 pr-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-400 transition-all"
+                              className={`w-full bg-slate-950 border ${
+                                ownerEmailTouched && ownerEmailError
+                                  ? 'border-rose-500/80 bg-rose-950/20 focus:border-rose-500 focus:ring-1 focus:ring-rose-500/40 text-rose-100'
+                                  : ownerEmailTouched && !ownerEmailError && ownerEmail.trim()
+                                  ? 'border-emerald-500/60 focus:border-emerald-400'
+                                  : 'border-white/10 focus:border-emerald-400'
+                              } rounded-xl pl-10 pr-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none transition-all`}
                             />
                           </div>
-                          <span className="text-[10px] text-slate-500 block mt-1">
-                            Official business email for monthly invoices, GST receipts & payout statements.
-                          </span>
+                          {ownerEmailTouched && ownerEmailError ? (
+                            <div className="flex items-center gap-1.5 mt-1.5 text-rose-400 text-xs font-medium animate-fadeIn">
+                              <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                              <span>{ownerEmailError}</span>
+                            </div>
+                          ) : (
+                            <span className="text-[10px] text-slate-500 block mt-1">
+                              Official business email for monthly invoices, GST receipts & payout statements.
+                            </span>
+                          )}
                         </div>
 
                         {/* Owner Mobile */}
@@ -1488,16 +1673,37 @@ export const AuthModal = ({ setActiveTab, onOpenLegal }) => {
                             Business Email or Registered Mobile
                           </label>
                           <div className="relative">
-                            <Building2 className="absolute left-3.5 top-3 w-4 h-4 text-emerald-400" />
+                            <Building2 className={`absolute left-3.5 top-3 w-4 h-4 transition-colors ${
+                              identifierTouched && identifierError ? 'text-rose-400' : 'text-emerald-400'
+                            }`} />
                             <input
                               type="text"
                               required
                               value={identifier}
-                              onChange={(e) => setIdentifier(e.target.value)}
+                              onChange={(e) => {
+                                setIdentifier(e.target.value);
+                                if (identifierTouched) validateIdentifier(e.target.value);
+                              }}
+                              onBlur={(e) => {
+                                setIdentifierTouched(true);
+                                validateIdentifier(e.target.value);
+                              }}
                               placeholder="partner@gsfitness.com or 9123456780"
-                              className="w-full bg-slate-950 border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-400"
+                              className={`w-full bg-slate-950 border ${
+                                identifierTouched && identifierError
+                                  ? 'border-rose-500/80 bg-rose-950/20 focus:border-rose-500 focus:ring-1 focus:ring-rose-500/40 text-rose-100'
+                                  : identifierTouched && !identifierError && identifier.includes('@') && isValidEmail(identifier.trim())
+                                  ? 'border-emerald-500/60 focus:border-emerald-400'
+                                  : 'border-white/10 focus:border-emerald-400'
+                              } rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none transition-all`}
                             />
                           </div>
+                          {identifierTouched && identifierError && (
+                            <div className="flex items-center gap-1.5 mt-1.5 text-rose-400 text-xs font-medium animate-fadeIn">
+                              <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                              <span>{identifierError}</span>
+                            </div>
+                          )}
                         </div>
 
                         <div>
