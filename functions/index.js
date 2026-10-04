@@ -271,110 +271,165 @@ const Razorpay = require('razorpay');
 const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID || 'rzp_test_TYwrtzZ7ROjR5s';
 const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET || 'iCMp86n6cDSwv3OSU8qrdo3Z';
 
-let razorpayInstance = null;
-function getRazorpayClient() {
-  if (!razorpayInstance) {
-    razorpayInstance = new Razorpay({
-      key_id: RAZORPAY_KEY_ID,
-      key_secret: RAZORPAY_KEY_SECRET
+const razorpay = new Razorpay({
+  key_id: RAZORPAY_KEY_ID,
+  key_secret: RAZORPAY_KEY_SECRET
+});
+
+/**
+ * HTTPS REST Endpoint: /api/create-order or /apiCreateRazorpayOrder
+ */
+exports.apiCreateRazorpayOrder = functions.https.onRequest(async (req, res) => {
+  res.set('Access-Control-Allow-Origin', '*');
+  res.set('Access-Control-Allow-Headers', 'Content-Type');
+  res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(204).send('');
+  }
+
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method Not Allowed. Use POST.' });
+  }
+
+  try {
+    let body = req.body;
+    if (typeof body === 'string') {
+      try {
+        body = JSON.parse(body);
+      } catch (e) {}
+    }
+
+    const amount = body && body.amount ? Number(body.amount) : 200;
+    const amountInPaise = Math.max(100, Math.round(amount * 100));
+    const currency = (body && body.currency) || 'INR';
+    const receipt = (body && body.receipt) || `rcpt_${Date.now()}`;
+    const notes = (body && body.notes) || {};
+
+    const options = {
+      amount: amountInPaise,
+      currency: currency,
+      receipt: receipt,
+      notes: notes
+    };
+
+    const order = await razorpay.orders.create(options);
+
+    return res.status(200).json({
+      success: true,
+      order_id: order.id,
+      amount: order.amount,
+      currency: order.currency,
+      receipt: order.receipt,
+      key_id: RAZORPAY_KEY_ID
+    });
+  } catch (err) {
+    console.error("Razorpay Order Creation Error:", JSON.stringify(err, null, 2), err?.message || err?.description || err?.error?.description);
+    const errorMessage = err?.error?.description || err?.description || err?.message || 'Razorpay order creation failed';
+    return res.status(500).json({
+      error: errorMessage,
+      details: err?.error || err
     });
   }
-  return razorpayInstance;
-}
-
-/**
- * Core order creation logic
- */
-async function handleCreateOrderCore(data = {}) {
-  const amountInRupees = Number(data.amount) || 200;
-  const amountInPaise = Math.max(100, Math.round(amountInRupees * 100));
-  const currency = data.currency || 'INR';
-  const receipt = data.receipt || `receipt_${Date.now()}`;
-  const notes = data.notes || {};
-
-  const rzp = getRazorpayClient();
-  const order = await rzp.orders.create({
-    amount: amountInPaise,
-    currency: currency,
-    receipt: receipt,
-    notes: notes
-  });
-
-  return {
-    success: true,
-    order_id: order.id,
-    amount: order.amount,
-    currency: order.currency,
-    receipt: order.receipt,
-    key_id: RAZORPAY_KEY_ID
-  };
-}
-
-/**
- * Core payment verification logic using HMAC-SHA256
- */
-async function handleVerifyPaymentCore(data = {}) {
-  const order_id = data.order_id || data.razorpay_order_id;
-  const payment_id = data.payment_id || data.razorpay_payment_id;
-  const signature = data.signature || data.razorpay_signature;
-
-  if (!payment_id) {
-    throw new functions.https.HttpsError('invalid-argument', 'Missing payment ID');
-  }
-
-  if (order_id && signature) {
-    const generatedSignature = crypto
-      .createHmac('sha256', RAZORPAY_KEY_SECRET)
-      .update(`${order_id}|${payment_id}`)
-      .digest('hex');
-
-    if (generatedSignature !== signature) {
-      return {
-        success: false,
-        verified: false,
-        error: 'Invalid payment signature. Verification failed.'
-      };
-    }
-  }
-
-  return {
-    success: true,
-    verified: true,
-    payment_id: payment_id,
-    order_id: order_id || null,
-    message: 'Payment signature verified successfully.'
-  };
-}
+});
 
 /**
  * Callable Function: createRazorpayOrder
  */
 exports.createRazorpayOrder = functions.https.onCall(async (data, context) => {
   try {
-    return await handleCreateOrderCore(data || {});
+    const amount = data && data.amount ? Number(data.amount) : 200;
+    const amountInPaise = Math.max(100, Math.round(amount * 100));
+    const currency = (data && data.currency) || 'INR';
+    const receipt = (data && data.receipt) || `rcpt_${Date.now()}`;
+    const notes = (data && data.notes) || {};
+
+    const options = {
+      amount: amountInPaise,
+      currency: currency,
+      receipt: receipt,
+      notes: notes
+    };
+
+    const order = await razorpay.orders.create(options);
+
+    return {
+      success: true,
+      order_id: order.id,
+      amount: order.amount,
+      currency: order.currency,
+      receipt: order.receipt,
+      key_id: RAZORPAY_KEY_ID
+    };
   } catch (err) {
-    console.error('[createRazorpayOrder] Callable error:', err.message);
+    console.error('[createRazorpayOrder] Callable error:', err);
     if (err instanceof functions.https.HttpsError) throw err;
     throw new functions.https.HttpsError('internal', err.message || 'Failed to create Razorpay order.');
   }
 });
 
 /**
- * HTTPS REST Endpoint: /api/create-order or /apiCreateRazorpayOrder
+ * HTTPS REST Endpoint: /api/verify-payment or /apiVerifyRazorpayPayment
  */
-exports.apiCreateRazorpayOrder = functions.https.onRequest((req, res) => {
-  cors(req, res, async () => {
-    if (req.method !== 'POST') {
-      return res.status(405).json({ error: 'Method Not Allowed. Use POST.' });
+exports.apiVerifyRazorpayPayment = functions.https.onRequest(async (req, res) => {
+  res.set('Access-Control-Allow-Origin', '*');
+  res.set('Access-Control-Allow-Headers', 'Content-Type');
+  res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(204).send('');
+  }
+
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method Not Allowed. Use POST.' });
+  }
+
+  try {
+    let body = req.body;
+    if (typeof body === 'string') {
+      try {
+        body = JSON.parse(body);
+      } catch (e) {}
     }
-    try {
-      const result = await handleCreateOrderCore(req.body || {});
-      return res.status(200).json(result);
-    } catch (err) {
-      console.error('[apiCreateRazorpayOrder] Error:', err.message);
-      return res.status(500).json({ error: err.message });
+
+    const order_id = body?.order_id || body?.razorpay_order_id;
+    const payment_id = body?.payment_id || body?.razorpay_payment_id;
+    const signature = body?.signature || body?.razorpay_signature;
+
+    if (!payment_id) {
+      return res.status(400).json({ success: false, verified: false, error: 'Missing payment ID' });
     }
-  });
+
+    if (order_id && signature) {
+      const generatedSignature = crypto
+        .createHmac('sha256', RAZORPAY_KEY_SECRET)
+        .update(`${order_id}|${payment_id}`)
+        .digest('hex');
+
+      if (generatedSignature !== signature) {
+        return res.status(400).json({
+          success: false,
+          verified: false,
+          error: 'Invalid payment signature. Verification failed.'
+        });
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      verified: true,
+      payment_id: payment_id,
+      order_id: order_id || null,
+      message: 'Payment signature verified successfully.'
+    });
+  } catch (err) {
+    console.error("Razorpay Payment Verification Error:", JSON.stringify(err, null, 2), err?.message || err?.description || err?.error?.description);
+    const errorMessage = err?.error?.description || err?.description || err?.message || 'Payment signature verification failed';
+    return res.status(500).json({
+      error: errorMessage,
+      details: err?.error || err
+    });
+  }
 });
 
 /**
@@ -382,29 +437,41 @@ exports.apiCreateRazorpayOrder = functions.https.onRequest((req, res) => {
  */
 exports.verifyRazorpayPayment = functions.https.onCall(async (data, context) => {
   try {
-    return await handleVerifyPaymentCore(data || {});
+    const order_id = data?.order_id || data?.razorpay_order_id;
+    const payment_id = data?.payment_id || data?.razorpay_payment_id;
+    const signature = data?.signature || data?.razorpay_signature;
+
+    if (!payment_id) {
+      throw new functions.https.HttpsError('invalid-argument', 'Missing payment ID');
+    }
+
+    if (order_id && signature) {
+      const generatedSignature = crypto
+        .createHmac('sha256', RAZORPAY_KEY_SECRET)
+        .update(`${order_id}|${payment_id}`)
+        .digest('hex');
+
+      if (generatedSignature !== signature) {
+        return {
+          success: false,
+          verified: false,
+          error: 'Invalid payment signature. Verification failed.'
+        };
+      }
+    }
+
+    return {
+      success: true,
+      verified: true,
+      payment_id: payment_id,
+      order_id: order_id || null,
+      message: 'Payment signature verified successfully.'
+    };
   } catch (err) {
-    console.error('[verifyRazorpayPayment] Callable error:', err.message);
+    console.error('[verifyRazorpayPayment] Callable error:', err);
     if (err instanceof functions.https.HttpsError) throw err;
     throw new functions.https.HttpsError('internal', err.message || 'Payment signature verification failed.');
   }
 });
 
-/**
- * HTTPS REST Endpoint: /api/verify-payment or /apiVerifyRazorpayPayment
- */
-exports.apiVerifyRazorpayPayment = functions.https.onRequest((req, res) => {
-  cors(req, res, async () => {
-    if (req.method !== 'POST') {
-      return res.status(405).json({ error: 'Method Not Allowed. Use POST.' });
-    }
-    try {
-      const result = await handleVerifyPaymentCore(req.body || {});
-      return res.status(200).json(result);
-    } catch (err) {
-      console.error('[apiVerifyRazorpayPayment] Error:', err.message);
-      return res.status(500).json({ error: err.message });
-    }
-  });
-});
 
