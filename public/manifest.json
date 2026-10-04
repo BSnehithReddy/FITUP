@@ -1,38 +1,33 @@
 {
   "name": "FITUP - Gym Booking Platform",
   "short_name": "FITUP",
-  "description": "Book gym passes and manage fitness memberships seamlessly.",
+  "id": "/",
   "start_url": "/",
-  "scope": "/",
   "display": "standalone",
-  "orientation": "portrait-primary",
   "background_color": "#0B0F19",
   "theme_color": "#0B0F19",
-  "categories": ["fitness", "lifestyle", "sports", "health"],
+  "description": "Book gym passes and manage fitness memberships seamlessly.",
   "icons": [
-    {
-      "src": "/icon-192x192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/icon-512x512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
     {
       "src": "/icons/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any"
+      "purpose": "any maskable"
     },
     {
       "src": "/icons/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any"
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "FITUP Home Screen"
     }
   ]
 }
