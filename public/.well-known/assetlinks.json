@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "app.web.fitup_ccb95.twa",
+        "sha256_cert_fingerprints": ["C6:95:82:6B:66:09:6C:55:15:F1:2C:17:66:2B:32:07:16:8F:49:F9:58:21:36:F3:CB:9D:EA:0D:8F:D1:8B:43"]
+      }
+    }]
