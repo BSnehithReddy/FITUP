@@ -16,8 +16,8 @@ function razorpayDevMiddleware() {
               const parsed = body ? JSON.parse(body) : {};
               const amountInRupees = Number(parsed.amount) || 200;
               const amountInPaise = Math.max(100, Math.round(amountInRupees * 100));
-              const keyId = process.env.RAZORPAY_KEY_ID || 'rzp_test_TYwrtzZ7ROjR5s';
-              const keySecret = process.env.RAZORPAY_KEY_SECRET || 'iCMp86n6cDSwv3OSU8qrdo3Z';
+              const keyId = process.env.RAZORPAY_KEY_ID || 'rzp_test_Tjt5C5NWH7tvkP';
+              const keySecret = process.env.RAZORPAY_KEY_SECRET || 'I70iSSw8oIZm1uOYuY5NxIRH';
               const basicAuth = Buffer.from(`${keyId}:${keySecret}`).toString('base64');
 
               const response = await fetch('https://api.razorpay.com/v1/orders', {
@@ -69,7 +69,7 @@ function razorpayDevMiddleware() {
             try {
               const parsed = body ? JSON.parse(body) : {};
               const { order_id, razorpay_payment_id, razorpay_signature } = parsed;
-              const keySecret = process.env.RAZORPAY_KEY_SECRET || 'iCMp86n6cDSwv3OSU8qrdo3Z';
+              const keySecret = process.env.RAZORPAY_KEY_SECRET || 'I70iSSw8oIZm1uOYuY5NxIRH';
               
               if (!order_id || !razorpay_payment_id || !razorpay_signature) {
                 res.statusCode = 400;
@@ -116,8 +116,8 @@ function razorpayDevMiddleware() {
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
-  process.env.RAZORPAY_KEY_ID = env.RAZORPAY_KEY_ID || 'rzp_test_TYwrtzZ7ROjR5s';
-  process.env.RAZORPAY_KEY_SECRET = env.RAZORPAY_KEY_SECRET || 'iCMp86n6cDSwv3OSU8qrdo3Z';
+  process.env.RAZORPAY_KEY_ID = env.RAZORPAY_KEY_ID || 'rzp_test_Tjt5C5NWH7tvkP';
+  process.env.RAZORPAY_KEY_SECRET = env.RAZORPAY_KEY_SECRET || 'I70iSSw8oIZm1uOYuY5NxIRH';
 
   return {
     plugins: [react(), razorpayDevMiddleware()],

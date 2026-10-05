@@ -2,7 +2,7 @@
  * FITUP Razorpay Standard Checkout & Verification Service
  */
 
-const DEFAULT_KEY_ID = import.meta.env?.VITE_RAZORPAY_KEY_ID || 'rzp_test_TYwrtzZ7ROjR5s';
+const DEFAULT_KEY_ID = import.meta.env?.VITE_RAZORPAY_KEY_ID || 'rzp_test_Tjt5C5NWH7tvkP';
 
 class RazorpayService {
   getActiveKeyId() {

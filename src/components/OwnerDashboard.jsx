@@ -78,7 +78,7 @@ export const OwnerDashboard = ({ setActiveTab }) => {
   const [ownerConfig, setOwnerConfig] = useState({ 
     ownerUpiId: '9030118909@ybl', 
     ownerQrCodeUrl: '', 
-    razorpayKeyId: localStorage.getItem('fitup_razorpay_key') || 'rzp_test_TYwrtzZ7ROjR5s',
+    razorpayKeyId: localStorage.getItem('fitup_razorpay_key') || 'rzp_test_Tjt5C5NWH7tvkP',
     defaultPlatformSplit: 20,
     defaultGymSplit: 30,
     defaultTrainerSplit: 50
@@ -142,7 +142,7 @@ export const OwnerDashboard = ({ setActiveTab }) => {
   const [upiForm, setUpiForm] = useState({
     ownerUpiId: localStorage.getItem('fitup_owner_upi') || '9030118909@ybl',
     ownerQrCodeUrl: '',
-    razorpayKeyId: localStorage.getItem('fitup_razorpay_key') || 'rzp_test_TYwrtzZ7ROjR5s'
+    razorpayKeyId: localStorage.getItem('fitup_razorpay_key') || 'rzp_test_Tjt5C5NWH7tvkP'
   });
 
   const [coupons, setCoupons] = useState(firestoreService.getCouponsSync());
@@ -179,7 +179,7 @@ export const OwnerDashboard = ({ setActiveTab }) => {
         setUpiForm({
           ownerUpiId: c.ownerUpiId || localStorage.getItem('fitup_owner_upi') || '9030118909@ybl',
           ownerQrCodeUrl: c.ownerQrCodeUrl || '',
-          razorpayKeyId: c.razorpayKeyId || localStorage.getItem('fitup_razorpay_key') || 'rzp_test_TYwrtzZ7ROjR5s'
+          razorpayKeyId: c.razorpayKeyId || localStorage.getItem('fitup_razorpay_key') || 'rzp_test_Tjt5C5NWH7tvkP'
         });
       }
     } catch (e) {
@@ -206,7 +206,7 @@ export const OwnerDashboard = ({ setActiveTab }) => {
         setUpiForm({ 
           ownerUpiId: cfg.ownerUpiId || localStorage.getItem('fitup_owner_upi') || '9030118909@ybl', 
           ownerQrCodeUrl: cfg.ownerQrCodeUrl || '',
-          razorpayKeyId: cfg.razorpayKeyId || localStorage.getItem('fitup_razorpay_key') || 'rzp_test_TYwrtzZ7ROjR5s'
+          razorpayKeyId: cfg.razorpayKeyId || localStorage.getItem('fitup_razorpay_key') || 'rzp_test_Tjt5C5NWH7tvkP'
         });
       }
     });

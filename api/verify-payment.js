@@ -35,7 +35,7 @@ export default async function handler(req, res) {
       });
     }
 
-    const keySecret = process.env.RAZORPAY_KEY_SECRET || 'iCMp86n6cDSwv3OSU8qrdo3Z';
+    const keySecret = process.env.RAZORPAY_KEY_SECRET || 'I70iSSw8oIZm1uOYuY5NxIRH';
 
     const generatedSignature = crypto
       .createHmac('sha256', keySecret)

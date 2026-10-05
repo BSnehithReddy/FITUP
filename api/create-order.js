@@ -31,8 +31,8 @@ export default async function handler(req, res) {
     const receipt = body.receipt || `rcpt_fitup_${Date.now()}`;
     const notes = body.notes || { platform: 'FITUP Gym Booking' };
 
-    const keyId = process.env.RAZORPAY_KEY_ID || 'rzp_test_TYwrtzZ7ROjR5s';
-    const keySecret = process.env.RAZORPAY_KEY_SECRET || 'iCMp86n6cDSwv3OSU8qrdo3Z';
+    const keyId = process.env.RAZORPAY_KEY_ID || 'rzp_test_Tjt5C5NWH7tvkP';
+    const keySecret = process.env.RAZORPAY_KEY_SECRET || 'I70iSSw8oIZm1uOYuY5NxIRH';
 
     const basicAuth = Buffer.from(`${keyId}:${keySecret}`).toString('base64');
 
