@@ -5,7 +5,6 @@ import crypto from 'crypto';
  * Verifies Razorpay signature using HMAC SHA-256
  */
 
-export default async function handler(req, res) {
   // Set CORS headers
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -35,7 +34,7 @@ export default async function handler(req, res) {
       });
     }
 
-    const keySecret = process.env.RAZORPAY_KEY_SECRET || 'I70iSSw8oIZm1uOYuY5NxIRH';
+    const keySecret = process.env.RAZORPAY_KEY_SECRET || 'azOQbrJ9Yzvb3tpROla3HL9a';
 
     const generatedSignature = crypto
       .createHmac('sha256', keySecret)

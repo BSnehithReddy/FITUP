@@ -268,8 +268,8 @@ exports.apiVerifyCustomOtp = functions.https.onRequest((req, res) => {
 // =========================================================================
 
 const Razorpay = require('razorpay');
-const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID || 'rzp_test_Tjt5C5NWH7tvkP';
-const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET || 'I70iSSw8oIZm1uOYuY5NxIRH';
+const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID || 'rzp_live_TkeVnK3TnhEPb1';
+const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET || 'azOQbrJ9Yzvb3tpROla3HL9a';
 
 const razorpay = new Razorpay({
   key_id: RAZORPAY_KEY_ID,

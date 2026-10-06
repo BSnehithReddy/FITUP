@@ -78,7 +78,7 @@ export const OwnerDashboard = ({ setActiveTab }) => {
   const [ownerConfig, setOwnerConfig] = useState({ 
     ownerUpiId: '9030118909@ybl', 
     ownerQrCodeUrl: '', 
-    razorpayKeyId: localStorage.getItem('fitup_razorpay_key') || 'rzp_test_Tjt5C5NWH7tvkP',
+    razorpayKeyId: localStorage.getItem('fitup_razorpay_key') || 'rzp_live_TkeVnK3TnhEPb1',
     defaultPlatformSplit: 20,
     defaultGymSplit: 30,
     defaultTrainerSplit: 50
@@ -142,7 +142,7 @@ export const OwnerDashboard = ({ setActiveTab }) => {
   const [upiForm, setUpiForm] = useState({
     ownerUpiId: localStorage.getItem('fitup_owner_upi') || '9030118909@ybl',
     ownerQrCodeUrl: '',
-    razorpayKeyId: localStorage.getItem('fitup_razorpay_key') || 'rzp_test_Tjt5C5NWH7tvkP'
+    razorpayKeyId: localStorage.getItem('fitup_razorpay_key') || 'rzp_live_TkeVnK3TnhEPb1'
   });
 
   const [coupons, setCoupons] = useState(firestoreService.getCouponsSync());
@@ -179,7 +179,7 @@ export const OwnerDashboard = ({ setActiveTab }) => {
         setUpiForm({
           ownerUpiId: c.ownerUpiId || localStorage.getItem('fitup_owner_upi') || '9030118909@ybl',
           ownerQrCodeUrl: c.ownerQrCodeUrl || '',
-          razorpayKeyId: c.razorpayKeyId || localStorage.getItem('fitup_razorpay_key') || 'rzp_test_Tjt5C5NWH7tvkP'
+          razorpayKeyId: c.razorpayKeyId || localStorage.getItem('fitup_razorpay_key') || 'rzp_live_TkeVnK3TnhEPb1'
         });
       }
     } catch (e) {
@@ -206,7 +206,7 @@ export const OwnerDashboard = ({ setActiveTab }) => {
         setUpiForm({ 
           ownerUpiId: cfg.ownerUpiId || localStorage.getItem('fitup_owner_upi') || '9030118909@ybl', 
           ownerQrCodeUrl: cfg.ownerQrCodeUrl || '',
-          razorpayKeyId: cfg.razorpayKeyId || localStorage.getItem('fitup_razorpay_key') || 'rzp_test_Tjt5C5NWH7tvkP'
+          razorpayKeyId: cfg.razorpayKeyId || localStorage.getItem('fitup_razorpay_key') || 'rzp_live_TkeVnK3TnhEPb1'
         });
       }
     });
@@ -894,7 +894,7 @@ export const OwnerDashboard = ({ setActiveTab }) => {
               type="text"
               value={upiForm.razorpayKeyId}
               onChange={(e) => setUpiForm({ ...upiForm, razorpayKeyId: e.target.value })}
-              placeholder="e.g. rzp_test_FITUPDemoKey"
+              placeholder="e.g. rzp_live_FITUPKey"
               className="w-full bg-slate-900 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-emerald-400 font-mono"
             />
           </div>
